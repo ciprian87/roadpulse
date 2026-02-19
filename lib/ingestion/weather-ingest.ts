@@ -1,6 +1,7 @@
 import { pool } from "@/lib/db/index";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { fetchRawAlerts, parseAlerts, type NormalizedAlert } from "@/lib/weather/nws";
+import { fetchZoneGeometryMap, mergeToMultiPolygon } from "@/lib/weather/zone-resolver";
 
 const CACHE_KEY = "nws:alerts:raw";
 const CACHE_TTL_SECONDS = 120; // 2 minutes — matches NWS rate limit guidance
@@ -94,6 +95,33 @@ export async function ingestWeatherAlerts(): Promise<IngestResult> {
 
     const fetchMs = Date.now() - fetchStart;
     const alerts = parseAlerts(rawJson);
+
+    // Enrich alerts that lack direct NWS polygon geometry by resolving their
+    // affectedZones URLs. Zone geometries are cached 24h in Redis — only slow
+    // on the very first ingestion run; subsequent runs are fully served from cache.
+    const zoneUrls: string[] = [];
+    for (const alert of alerts) {
+      if (!alert.geometry_geojson) {
+        for (const url of alert.raw.properties.affectedZones) {
+          zoneUrls.push(url);
+        }
+      }
+    }
+
+    if (zoneUrls.length > 0) {
+      const zoneGeomMap = await fetchZoneGeometryMap(zoneUrls);
+      for (const alert of alerts) {
+        if (!alert.geometry_geojson) {
+          const zoneGeoms = alert.raw.properties.affectedZones.map((url) =>
+            zoneGeomMap.get(url)
+          );
+          const merged = mergeToMultiPolygon(zoneGeoms);
+          if (merged) {
+            alert.geometry_geojson = JSON.stringify(merged);
+          }
+        }
+      }
+    }
 
     // Upsert all road-relevant active alerts
     for (const alert of alerts) {
