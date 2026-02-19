@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
+/* ─── Design Tokens ─────────────────────────────────────────────────────── */
+
+@theme {
+  /* Severity palette (used as Tailwind utilities: bg-rp-critical, etc.) */
+  --color-rp-critical: var(--rp-critical);
+  --color-rp-warning: var(--rp-warning);
+  --color-rp-advisory: var(--rp-advisory);
+  --color-rp-info: var(--rp-info);
+  --color-rp-clear: var(--rp-clear);
+
+  /* Surface tokens */
+  --color-rp-bg: var(--rp-bg);
+  --color-rp-surface: var(--rp-surface);
+  --color-rp-surface-2: var(--rp-surface-2);
+  --color-rp-border: var(--rp-border);
+  --color-rp-text: var(--rp-text);
+  --color-rp-text-muted: var(--rp-text-muted);
+
+  /* Fonts */
+  --font-sans: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
+/* ─── Dark theme (default) ──────────────────────────────────────────────── */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Severity */
+  --rp-critical: #ff4d4f;
+  --rp-warning: #ff8c00;
+  --rp-advisory: #ffd000;
+  --rp-info: #4096ff;
+  --rp-clear: #36cfc9;
+
+  /* Surfaces */
+  --rp-bg: #0a0a0f;
+  --rp-surface: #111118;
+  --rp-surface-2: #1a1a24;
+  --rp-border: #2a2a38;
+  --rp-text: #f0f0f5;
+  --rp-text-muted: #7a7a9a;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Light theme ───────────────────────────────────────────────────────── */
+
+[data-theme="light"] {
+  --rp-bg: #f5f5f8;
+  --rp-surface: #ffffff;
+  --rp-surface-2: #ebebf0;
+  --rp-border: #d8d8e8;
+  --rp-text: #0f0f1a;
+  --rp-text-muted: #6b6b88;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ─── Base styles ───────────────────────────────────────────────────────── */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--rp-bg);
+  color: var(--rp-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

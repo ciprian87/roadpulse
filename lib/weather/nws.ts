@@ -1,3 +1,25 @@
+// NWS marine and Great Lakes zone prefixes.
+// Alerts whose every affected zone carries one of these prefixes are
+// open-water events — irrelevant to truck drivers and excluded from ingestion.
+const MARINE_ZONE_PREFIXES = new Set([
+  "AM", "AN",             // Atlantic Ocean (coastal / north)
+  "GM",                   // Gulf of Mexico
+  "LC", "LE", "LH",      // Lake St. Clair, Erie, Huron
+  "LM", "LO", "LS",      // Lake Michigan, Ontario, Superior
+  "PH", "PK", "PM",      // Pacific: Hawaii, Alaska, open ocean
+  "PS", "PZ",             // Pacific: south, coastal
+  "SL",                   // St. Lawrence River
+]);
+
+// Returns true when every zone in the list is a marine/lake zone,
+// meaning the alert has no land area relevant to road travel.
+function isMarineOnly(affectedZones: string[]): boolean {
+  if (affectedZones.length === 0) return false;
+  return affectedZones.every((zoneId) =>
+    MARINE_ZONE_PREFIXES.has(zoneId.slice(0, 2).toUpperCase())
+  );
+}
+
 // NWS alert types relevant to commercial truck drivers.
 // Narrowly scoped to events that affect road conditions or driver safety.
 // Informational watches (e.g. Freeze Watch, Frost Advisory) are intentionally excluded
@@ -23,6 +45,13 @@ export const ROAD_RELEVANT_ALERT_TYPES = new Set([
   "Winter Weather Advisory",
   "Freezing Rain Advisory",
   "Heavy Snow Warning",
+  // Fire weather — Red Flag Warnings restrict CMV operations like blizzard warnings
+  "Red Flag Warning",
+  "Fire Weather Watch",
+  // Avalanche — critical for mountain pass routes (CO, WA, OR, etc.)
+  "Avalanche Warning",
+  // Tornado watch — driver safety in severe convective events
+  "Tornado Watch",
 ]);
 
 // Raw shapes from the NWS GeoJSON alerts API.
@@ -184,7 +213,8 @@ export function parseAlerts(rawJson: string): NormalizedAlert[] {
       (f) =>
         f.type === "Feature" &&
         f.properties?.status === "Actual" &&
-        ROAD_RELEVANT_ALERT_TYPES.has(f.properties?.event)
+        ROAD_RELEVANT_ALERT_TYPES.has(f.properties?.event) &&
+        !isMarineOnly(f.properties.affectedZones.map(extractZoneId))
     )
     .map(normalizeFeature);
 }

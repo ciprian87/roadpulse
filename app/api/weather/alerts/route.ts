@@ -66,7 +66,10 @@ export async function GET(
   };
 
   if (activeOnly) {
-    conditions.push("wa.is_active = true");
+    // Exclude alerts that NWS has already marked inactive AND alerts whose
+    // expires timestamp has passed — the latter handles the window between
+    // an alert expiring and the next ingest run deactivating it in the DB.
+    conditions.push("wa.is_active = true AND (wa.expires IS NULL OR wa.expires > NOW())");
   }
 
   if (state) {
