@@ -1,65 +1,212 @@
-import Image from "next/image";
+import type { Metadata } from "next";
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: "RoadPulse",
+  description:
+    "Real-time road closures, weather alerts, and hazards for commercial truck drivers",
+};
+
+// Disable static caching so the health status is always live
+export const revalidate = 0;
+
+interface TableCount {
+  table: string;
+  rows: number;
+}
+
+interface HealthData {
+  status: "ok" | "degraded";
+  timestamp: string;
+  database: {
+    connected: boolean;
+    postgis: boolean;
+    tables: TableCount[];
+    error?: string;
+  };
+  redis: {
+    connected: boolean;
+    error?: string;
+  };
+}
+
+async function fetchHealth(): Promise<HealthData | null> {
+  try {
+    // In server components we call the local API directly
+    const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const res = await fetch(`${baseUrl}/api/health`, { cache: "no-store" });
+    return (await res.json()) as HealthData;
+  } catch {
+    return null;
+  }
+}
+
+function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${
+        ok
+          ? "bg-teal-950 text-teal-300 ring-1 ring-teal-600"
+          : "bg-red-950 text-red-300 ring-1 ring-red-600"
+      }`}
+    >
+      <span
+        className={`h-2 w-2 rounded-full ${ok ? "bg-teal-400" : "bg-red-400"}`}
+        aria-hidden="true"
+      />
+      {label}
+    </span>
+  );
+}
+
+export default async function Home() {
+  const health = await fetchHealth();
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 font-sans">
+      {/* Header */}
+      <header className="border-b border-zinc-800 px-6 py-4">
+        <div className="mx-auto max-w-4xl flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              RoadPulse
+            </h1>
+            <p className="text-sm text-zinc-400 mt-0.5">
+              Real-time hazards for commercial truck drivers
+            </p>
+          </div>
+          {health && (
+            <StatusBadge
+              ok={health.status === "ok"}
+              label={
+                health.status === "ok" ? "All systems operational" : "Degraded"
+              }
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          )}
         </div>
-      </main>
-    </div>
+      </header>
+
+      {/* Content */}
+      <div className="mx-auto max-w-4xl px-6 py-10 space-y-8">
+        {health === null ? (
+          <div className="rounded-lg border border-red-800 bg-red-950/40 p-6 text-red-300">
+            Could not reach the health API. Make sure the dev server is running.
+          </div>
+        ) : (
+          <>
+            {/* Connection status */}
+            <section>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-4">
+                Infrastructure
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Database */}
+                <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-medium text-zinc-200">
+                      PostgreSQL + PostGIS
+                    </span>
+                    <StatusBadge
+                      ok={health.database.connected}
+                      label={
+                        health.database.connected ? "Connected" : "Offline"
+                      }
+                    />
+                  </div>
+                  {health.database.connected && (
+                    <p className="text-sm text-zinc-500">
+                      PostGIS:{" "}
+                      <span
+                        className={
+                          health.database.postgis
+                            ? "text-teal-400"
+                            : "text-red-400"
+                        }
+                      >
+                        {health.database.postgis ? "available" : "missing"}
+                      </span>
+                    </p>
+                  )}
+                  {health.database.error && (
+                    <p className="text-sm text-red-400 mt-1">
+                      {health.database.error}
+                    </p>
+                  )}
+                </div>
+
+                {/* Redis */}
+                <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-zinc-200">Redis</span>
+                    <StatusBadge
+                      ok={health.redis.connected}
+                      label={health.redis.connected ? "Connected" : "Offline"}
+                    />
+                  </div>
+                  {health.redis.error && (
+                    <p className="text-sm text-red-400 mt-1">
+                      {health.redis.error}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            {/* Table row counts */}
+            {health.database.tables.length > 0 && (
+              <section>
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500 mb-4">
+                  Database Tables
+                </h2>
+                <div className="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-zinc-800">
+                        <th className="text-left px-5 py-3 text-zinc-400 font-medium">
+                          Table
+                        </th>
+                        <th className="text-right px-5 py-3 text-zinc-400 font-medium">
+                          Rows
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-800">
+                      {health.database.tables.map(({ table, rows }) => (
+                        <tr
+                          key={table}
+                          className="hover:bg-zinc-800/50 transition-colors"
+                        >
+                          <td className="px-5 py-3 font-mono text-zinc-300">
+                            {table}
+                          </td>
+                          <td className="px-5 py-3 text-right tabular-nums text-zinc-400">
+                            {rows.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            <p className="text-xs text-zinc-600">
+              Last checked:{" "}
+              <time dateTime={health.timestamp}>
+                {new Date(health.timestamp).toLocaleString()}
+              </time>
+            </p>
+          </>
+        )}
+
+        {/* Phase indicator */}
+        <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6">
+          <h2 className="text-sm font-semibold text-zinc-400 mb-1">Phase 0</h2>
+          <p className="text-zinc-500 text-sm leading-relaxed">
+            Project scaffolding complete. Next up: feed ingestion pipeline, NWS
+            weather alerts, and the route hazard API.
+          </p>
+        </section>
+      </div>
+    </main>
   );
 }
