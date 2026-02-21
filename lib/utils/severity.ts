@@ -1,13 +1,23 @@
 /**
  * Severity color mapping — single source of truth for the severity system.
  * Used by map markers, list badges, and the detail panel.
+ *
+ * NWS weather alert keys (Extreme, Severe, Moderate, Minor) and road event
+ * keys (CRITICAL, WARNING, ADVISORY, INFO) share the same hex values per
+ * the severity palette in CLAUDE.md.
  */
 export const SEVERITY_COLOR: Record<string, string> = {
+  // NWS weather alert severity keys
   Extreme: "#ff4d4f",
   Severe: "#ff8c00",
   Moderate: "#ffd000",
   Minor: "#4096ff",
   Unknown: "#8b93a8",
+  // Road event severity keys
+  CRITICAL: "#ff4d4f",
+  WARNING: "#ff8c00",
+  ADVISORY: "#ffd000",
+  INFO: "#4096ff",
 };
 
 /**

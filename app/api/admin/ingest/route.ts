@@ -1,28 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ingestWeatherAlerts } from "@/lib/ingestion/weather-ingest";
+import { runAllIngestJobs, type SchedulerResult } from "@/lib/ingestion/scheduler";
+import { getAdapterByName, getAllFeedNames } from "@/lib/feeds/feed-registry";
+import type { IngestResult } from "@/lib/ingestion/weather-ingest";
 
 interface IngestRequestBody {
   feed: string;
 }
 
-interface IngestResponse {
+interface SingleIngestResponse {
   feed: string;
-  result: {
-    upserted: number;
-    deactivated: number;
-    fetchMs: number;
-    total: number;
-  };
+  result: IngestResult;
+  timestamp: string;
+}
+
+interface AllIngestResponse {
+  results: SchedulerResult[];
   timestamp: string;
 }
 
 // POST /api/admin/ingest
 // Manually triggers a feed ingestion run. Useful for testing and development.
-// No auth required in Phase 1 — add NextAuth protection before going to production.
+// No auth required in Phase 3 — add NextAuth protection before going to production.
 export async function POST(
   request: NextRequest
 ): Promise<
-  NextResponse<IngestResponse | { error: string; code: string; details?: unknown }>
+  NextResponse<
+    | SingleIngestResponse
+    | AllIngestResponse
+    | { error: string; code: string; details?: unknown }
+  >
 > {
   let body: unknown;
   try {
@@ -43,25 +50,56 @@ export async function POST(
 
   const { feed } = body as IngestRequestBody;
 
-  if (feed !== "nws-alerts") {
-    return NextResponse.json(
-      { error: `Unknown feed: ${feed}`, code: "UNKNOWN_FEED" },
-      { status: 400 }
-    );
+  // "all" — run every registered feed sequentially
+  if (feed === "all") {
+    try {
+      const results = await runAllIngestJobs();
+      return NextResponse.json({ results, timestamp: new Date().toISOString() });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json(
+        { error: "Ingestion failed", code: "INGEST_ERROR", details: message },
+        { status: 500 }
+      );
+    }
   }
 
-  try {
-    const result = await ingestWeatherAlerts();
-    return NextResponse.json({
-      feed,
-      result,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json(
-      { error: "Ingestion failed", code: "INGEST_ERROR", details: message },
-      { status: 500 }
-    );
+  // "nws-alerts" — existing NWS pipeline
+  if (feed === "nws-alerts") {
+    try {
+      const result = await ingestWeatherAlerts();
+      return NextResponse.json({ feed, result, timestamp: new Date().toISOString() });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json(
+        { error: "Ingestion failed", code: "INGEST_ERROR", details: message },
+        { status: 500 }
+      );
+    }
   }
+
+  // Named adapter feeds (e.g. "iowa-wzdx")
+  const adapter = getAdapterByName(feed);
+  if (adapter) {
+    try {
+      const result = await adapter.ingest();
+      return NextResponse.json({ feed, result, timestamp: new Date().toISOString() });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      return NextResponse.json(
+        { error: "Ingestion failed", code: "INGEST_ERROR", details: message },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Unknown feed — list valid names to help the caller
+  const validFeeds = ["all", "nws-alerts", ...getAllFeedNames()];
+  return NextResponse.json(
+    {
+      error: `Unknown feed: ${feed}. Valid values: ${validFeeds.join(", ")}`,
+      code: "UNKNOWN_FEED",
+    },
+    { status: 400 }
+  );
 }

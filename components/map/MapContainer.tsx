@@ -5,10 +5,12 @@ import { MapContainer as LeafletMapContainer, TileLayer, useMap } from "react-le
 import "leaflet/dist/leaflet.css";
 import { useMapStore } from "@/stores/map-store";
 import { WeatherAlertMarkers } from "./WeatherAlertMarkers";
-import { AlertDetailPanel } from "@/components/alerts/AlertDetailPanel";
+import { RoadEventMarkers } from "./RoadEventMarkers";
+import { HazardDetailPanel } from "@/components/alerts/HazardDetailPanel";
 import { MapFilterBar } from "./MapFilterBar";
 import { MapLegend } from "./MapLegend";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
+import type { RoadEventApiItem } from "@/lib/types/road-event";
 
 const DARK_TILE =
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
@@ -39,16 +41,16 @@ export default function MapView() {
   const zoom = useMapStore((s) => s.zoom);
   const darkMode = useMapStore((s) => s.darkMode);
   const [alerts, setAlerts] = useState<WeatherAlertApiItem[]>([]);
+  const [events, setEvents] = useState<RoadEventApiItem[]>([]);
 
   return (
-    // Relative container so the desktop AlertDetailPanel can use absolute positioning
+    // Relative container so the desktop HazardDetailPanel can use absolute positioning
     <div className="relative w-full h-full">
       <LeafletMapContainer
         center={center}
         zoom={zoom}
         className="w-full h-full"
         zoomControl={true}
-        // Remove default attribution position — we'll keep the built-in one
       >
         <TileLayer
           key={darkMode ? "dark" : "light"}
@@ -60,10 +62,11 @@ export default function MapView() {
         <GeolocationFly />
 
         <WeatherAlertMarkers alerts={alerts} onAlertsChange={setAlerts} />
+        <RoadEventMarkers events={events} onEventsChange={setEvents} />
       </LeafletMapContainer>
 
-      {/* AlertDetailPanel lives outside the Leaflet DOM so it can overlay freely */}
-      <AlertDetailPanel />
+      {/* HazardDetailPanel lives outside the Leaflet DOM so it can overlay freely */}
+      <HazardDetailPanel />
 
       {/* Both overlays live outside the Leaflet DOM — pointer-events passthrough to map */}
       <MapLegend />

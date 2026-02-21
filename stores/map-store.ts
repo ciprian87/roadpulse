@@ -2,44 +2,75 @@
 
 import { create } from "zustand";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
-import { DEFAULT_VISIBLE_CATEGORIES } from "@/lib/utils/alert-categories";
+import type { RoadEventApiItem } from "@/lib/types/road-event";
+import {
+  DEFAULT_VISIBLE_CATEGORIES,
+  DEFAULT_VISIBLE_ROAD_TYPES,
+} from "@/lib/utils/alert-categories";
+
+export type SelectedHazard =
+  | { kind: "weather"; alert: WeatherAlertApiItem }
+  | { kind: "road"; event: RoadEventApiItem };
 
 interface MapState {
   center: [number, number];
   zoom: number;
+  selectedHazard: SelectedHazard | null;
+  // Backward-compatible alias kept for AlertDetailPanel.tsx (untouched file).
   selectedAlert: WeatherAlertApiItem | null;
   darkMode: boolean;
-  // Record<categoryKey, visible> — plain object so Zustand detects changes
+  // NWS weather alert category visibility
   visibleCategories: Record<string, boolean>;
+  // 511 / WZDx road event type visibility
+  visibleRoadTypes: Record<string, boolean>;
 
   setCenter: (center: [number, number]) => void;
   setZoom: (zoom: number) => void;
   selectAlert: (alert: WeatherAlertApiItem) => void;
+  selectEvent: (event: RoadEventApiItem) => void;
   clearSelection: () => void;
   toggleDarkMode: () => void;
   toggleCategory: (key: string) => void;
   resetCategories: () => void;
+  toggleRoadType: (key: string) => void;
+  resetRoadTypes: () => void;
 }
 
 export const useMapStore = create<MapState>((set) => ({
-  center: [39.5, -98.35], // geographic center of the contiguous US
+  center: [39.5, -98.35],
   zoom: 4,
+  selectedHazard: null,
   selectedAlert: null,
   darkMode: true,
   visibleCategories: { ...DEFAULT_VISIBLE_CATEGORIES },
+  visibleRoadTypes:  { ...DEFAULT_VISIBLE_ROAD_TYPES },
 
   setCenter: (center) => set({ center }),
   setZoom: (zoom) => set({ zoom }),
-  selectAlert: (alert) => set({ selectedAlert: alert }),
-  clearSelection: () => set({ selectedAlert: null }),
+
+  selectAlert: (alert) =>
+    set({ selectedHazard: { kind: "weather", alert }, selectedAlert: alert }),
+
+  selectEvent: (event) =>
+    set({ selectedHazard: { kind: "road", event }, selectedAlert: null }),
+
+  clearSelection: () => set({ selectedHazard: null, selectedAlert: null }),
+
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
+
   toggleCategory: (key) =>
     set((s) => ({
-      visibleCategories: {
-        ...s.visibleCategories,
-        [key]: !s.visibleCategories[key],
-      },
+      visibleCategories: { ...s.visibleCategories, [key]: !s.visibleCategories[key] },
     })),
+
   resetCategories: () =>
     set({ visibleCategories: { ...DEFAULT_VISIBLE_CATEGORIES } }),
+
+  toggleRoadType: (key) =>
+    set((s) => ({
+      visibleRoadTypes: { ...s.visibleRoadTypes, [key]: !s.visibleRoadTypes[key] },
+    })),
+
+  resetRoadTypes: () =>
+    set({ visibleRoadTypes: { ...DEFAULT_VISIBLE_ROAD_TYPES } }),
 }));

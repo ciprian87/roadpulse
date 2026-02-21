@@ -2,6 +2,9 @@
 // Each category has a fixed display color and label.
 // The "fire" category maps to CRITICAL red because Red Flag Warnings restrict
 // CMV operations the same way blizzard warnings do.
+//
+// Road event categories group WZDx/511 event types into four broad buckets.
+// ROAD_TYPE_TO_CATEGORY maps individual road_events.type values to a bucket key.
 
 export interface AlertCategory {
   key: string;
@@ -66,4 +69,35 @@ export const EVENT_TO_CATEGORY: Record<string, string> = {
 // Initial state: all categories visible
 export const DEFAULT_VISIBLE_CATEGORIES: Record<string, boolean> = Object.fromEntries(
   ALERT_CATEGORIES.map((c) => [c.key, true])
+);
+
+// ── Road event filter categories ───────────────────────────────────────────────
+
+export interface RoadEventCategory {
+  key: string;
+  label: string;
+  color: string;
+}
+
+export const ROAD_EVENT_CATEGORIES: RoadEventCategory[] = [
+  { key: "construction", label: "Work Zones",   color: "#ff8c00" },
+  { key: "closures",     label: "Closures",     color: "#ff4d4f" },
+  { key: "restrictions", label: "Restrictions", color: "#ffd000" },
+  { key: "incidents",    label: "Incidents",    color: "#f759ab" },
+];
+
+// Maps road_events.type values to a filter category key.
+// Types absent from this map are always shown (fail-open).
+export const ROAD_TYPE_TO_CATEGORY: Record<string, string> = {
+  CONSTRUCTION:    "construction",
+  CLOSURE:         "closures",
+  WEATHER_CLOSURE: "closures",
+  RESTRICTION:     "restrictions",
+  CHAIN_LAW:       "restrictions",
+  INCIDENT:        "incidents",
+  SPECIAL_EVENT:   "incidents",
+};
+
+export const DEFAULT_VISIBLE_ROAD_TYPES: Record<string, boolean> = Object.fromEntries(
+  ROAD_EVENT_CATEGORIES.map((c) => [c.key, true])
 );
