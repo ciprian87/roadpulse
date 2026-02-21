@@ -27,30 +27,26 @@ export function WeatherAlertMarkers({ alerts, onAlertsChange }: Props) {
 
   const geoJsonLayerRef = useRef<L.GeoJSON | null>(null);
 
-  // Create a single canvas-rendered GeoJSON layer on mount and remove it on unmount.
-  // Canvas renders all polygons onto one <canvas> element instead of individual
-  // SVG nodes, which handles hundreds of complex multi-polygon alert areas smoothly.
+  // Use the default SVG renderer — it gives each polygon an interactive SVG
+  // element that Leaflet can track for cursor changes and click events.
+  // Canvas would be faster for thousands of features, but for ~hundreds of
+  // weather alert polygons SVG is reliable and fully interactive.
   useEffect(() => {
-    const renderer = L.canvas({ padding: 0.5 });
-
-    // `renderer` is a valid Leaflet Path option accepted by L.geoJSON at runtime
-    // but missing from @types/leaflet GeoJSONOptions — cast through unknown.
     const layer = L.geoJSON(undefined, {
-      renderer,
-      style: (feature: GeoJSON.Feature) => {
+      style: (feature) => {
         const color = severityToColor((feature?.properties as { severity?: string })?.severity ?? "Unknown");
         return { color, fillColor: color, fillOpacity: 0.15, weight: 1.5 };
       },
       // Attach click handler once per feature; the stable ref lookup avoids
       // re-creating the handler on every alerts update.
-      onEachFeature: (_feature: GeoJSON.Feature, featureLayer: L.Layer) => {
+      onEachFeature: (_feature, featureLayer) => {
         featureLayer.on("click", () => {
-          const alertId: string = (_feature.properties as { alertId: string }).alertId;
+          const alertId = (_feature.properties as { alertId: string }).alertId;
           const alert = alertsRef.current.find((a) => a.id === alertId);
           if (alert) selectAlert(alert);
         });
       },
-    } as unknown as L.GeoJSONOptions);
+    });
 
     layer.addTo(map);
     geoJsonLayerRef.current = layer;
@@ -62,7 +58,7 @@ export function WeatherAlertMarkers({ alerts, onAlertsChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
-  // Re-populate the canvas layer whenever alerts or category filters change.
+  // Re-populate the SVG layer whenever alerts or category filters change.
   // clearLayers() + addData() is O(n) on the Leaflet side with no React diffing.
   useEffect(() => {
     const layer = geoJsonLayerRef.current;

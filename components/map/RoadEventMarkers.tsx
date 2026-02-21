@@ -107,8 +107,12 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
 
   const lineLayerRef = useRef<L.GeoJSON | null>(null);
   const markerGroupRef = useRef<L.LayerGroup | null>(null);
+  // Cluster bubbles live in their own group so the render effect (which only
+  // manages individual-event layers) never wipes them on the React cycle that
+  // follows onEventsChange([]).
+  const clusterGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Create canvas line layer + marker group once on mount
+  // Create canvas line layer + marker groups once on mount
   useEffect(() => {
     const renderer = L.canvas({ padding: 0.5 });
 
@@ -141,9 +145,13 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
     const markerGroup = L.layerGroup().addTo(map);
     markerGroupRef.current = markerGroup;
 
+    const clusterGroup = L.layerGroup().addTo(map);
+    clusterGroupRef.current = clusterGroup;
+
     return () => {
       lineLayer.remove();
       markerGroup.remove();
+      clusterGroup.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
@@ -204,31 +212,34 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
     const zoom = Math.round(map.getZoom());
 
     if (zoom < CLUSTER_ZOOM_THRESHOLD) {
-      // Low zoom: fetch server-side clusters, render as count-bubbles
-      const markerGroup = markerGroupRef.current;
-      const lineLayer = lineLayerRef.current;
-      if (!markerGroup || !lineLayer) return;
-
+      // Low zoom: fetch server-side clusters, render as count-bubbles.
+      // Bubbles go into clusterGroupRef — a layer the render effect never
+      // touches — so the React cycle triggered by onEventsChange([]) cannot
+      // wipe them before they appear.
       fetch(`/api/events/clusters?bbox=${bbox}&zoom=${zoom}`)
         .then((r) => r.json())
         .then((data: { clusters: ClusterPoint[] }) => {
-          lineLayer.clearLayers();
-          markerGroup.clearLayers();
-          onEventsChange([]); // no individual events at cluster zoom
+          lineLayerRef.current?.clearLayers();
+          markerGroupRef.current?.clearLayers();
+          clusterGroupRef.current?.clearLayers();
+          onEventsChange([]); // render effect fires but only clears lineLayer + markerGroup (already empty)
 
+          const clusterGroup = clusterGroupRef.current;
+          if (!clusterGroup) return;
           for (const cluster of data.clusters ?? []) {
             const [lng, lat] = cluster.geometry.coordinates;
             if (lng === undefined || lat === undefined) continue;
             const icon = createClusterIcon(cluster.count, cluster.has_critical, cluster.has_warning);
             const m = L.marker([lat, lng], { icon });
-            markerGroup.addLayer(m);
+            clusterGroup.addLayer(m);
           }
         })
         .catch(() => {
           // Non-fatal: keep current view
         });
     } else {
-      // High zoom: fetch individual events
+      // High zoom: clear cluster bubbles and fetch individual events.
+      clusterGroupRef.current?.clearLayers();
       fetch(`/api/events?bbox=${bbox}&active_only=true&zoom=${zoom}`)
         .then((r) => r.json())
         .then((data: { events: RoadEventApiItem[] }) => {
