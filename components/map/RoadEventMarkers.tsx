@@ -4,10 +4,15 @@ import { useEffect, useRef } from "react";
 import { useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
+import type { ClusterPoint } from "@/app/api/events/clusters/route";
 import { severityToColor } from "@/lib/utils/severity";
 import { createEventIcon, createClosureEndpointIcon } from "@/lib/utils/event-icons";
 import { useMapStore } from "@/stores/map-store";
 import { ROAD_TYPE_TO_CATEGORY } from "@/lib/utils/alert-categories";
+
+// Zoom threshold: at or above this zoom show individual events;
+// below it show cluster count-bubbles from the server.
+const CLUSTER_ZOOM_THRESHOLD = 8;
 
 interface Props {
   events: RoadEventApiItem[];
@@ -18,17 +23,10 @@ function isClosure(event: RoadEventApiItem): boolean {
   return event.severity === "CRITICAL" || event.type === "CLOSURE";
 }
 
-/** GeoJSON [lng, lat] → Leaflet [lat, lng] */
 function toLLng(coord: number[]): L.LatLngExpression {
   return [coord[1]!, coord[0]!] as L.LatLngExpression;
 }
 
-/**
- * Convert a road event geometry into a GeoJSON LineString/MultiLineString
- * suitable for the canvas polyline layer.
- * MultiPoint → LineString (the two points mark start/end of zone).
- * Point geometries have no line to draw; return null.
- */
 function geometryToLineFeature(
   geometry: GeoJSON.Geometry,
   id: string,
@@ -49,7 +47,6 @@ function geometryToLineFeature(
   return null;
 }
 
-/** Extract the first coordinate of any geometry as a Leaflet LatLng. */
 function firstCoord(geometry: GeoJSON.Geometry): L.LatLngExpression | null {
   if (geometry.type === "Point") return toLLng(geometry.coordinates);
   if (geometry.type === "MultiPoint" || geometry.type === "LineString") {
@@ -61,7 +58,6 @@ function firstCoord(geometry: GeoJSON.Geometry): L.LatLngExpression | null {
   return null;
 }
 
-/** Extract the last coordinate of any geometry as a Leaflet LatLng. */
 function lastCoord(geometry: GeoJSON.Geometry): L.LatLngExpression | null {
   if (geometry.type === "Point") return null;
   if (geometry.type === "MultiPoint" || geometry.type === "LineString") {
@@ -78,25 +74,41 @@ function lastCoord(geometry: GeoJSON.Geometry): L.LatLngExpression | null {
   return null;
 }
 
-/** Inner component that lives inside <MapContainer> and drives bbox-based fetching */
+/** Build an L.DivIcon count-bubble for a cluster marker. */
+function createClusterIcon(count: number, hasCritical: boolean, hasWarning: boolean): L.DivIcon {
+  const color = hasCritical ? "#ff4d4f" : hasWarning ? "#ff8c00" : "#4096ff";
+  const size = count > 99 ? 46 : count > 9 ? 40 : 34;
+  return L.divIcon({
+    className: "",
+    html: `<div style="
+      width:${size}px;height:${size}px;
+      border-radius:50%;
+      background-color:${color};
+      border:2px solid rgba(255,255,255,0.9);
+      box-shadow:0 2px 8px rgba(0,0,0,0.45);
+      display:flex;align-items:center;justify-content:center;
+      font-size:${count > 99 ? 11 : 12}px;
+      font-weight:700;color:white;
+      font-family:system-ui,sans-serif;
+    ">${count > 999 ? "999+" : count}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
+
 export function RoadEventMarkers({ events, onEventsChange }: Props) {
   const map = useMap();
   const selectEvent = useMapStore((s) => s.selectEvent);
   const visibleRoadTypes = useMapStore((s) => s.visibleRoadTypes);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Stable ref so the GeoJSON click handler can look up the event without
-  // being recreated on every render.
   const eventsRef = useRef<RoadEventApiItem[]>(events);
   eventsRef.current = events;
 
   const lineLayerRef = useRef<L.GeoJSON | null>(null);
   const markerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Create the canvas line layer + a marker group once on mount.
-  // Canvas: all polylines share one <canvas> element → O(1) DOM nodes regardless
-  // of event count. Marker group uses DOM-based DivIcons (unavoidable for custom icons)
-  // but there are far fewer of them than line segments.
+  // Create canvas line layer + marker group once on mount
   useEffect(() => {
     const renderer = L.canvas({ padding: 0.5 });
 
@@ -133,11 +145,10 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
       lineLayer.remove();
       markerGroup.remove();
     };
-    // selectEvent is a stable Zustand action
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
-  // Re-render all layers when events or visibility filters change.
+  // Re-render layers whenever events or visibility filters change
   useEffect(() => {
     const lineLayer = lineLayerRef.current;
     const markerGroup = markerGroupRef.current;
@@ -157,18 +168,11 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
       const closed = isClosure(event);
       const onClick = () => selectEvent(event);
 
-      // ── Line segment on canvas layer ────────────────────────────────────
-      const lineFeature = geometryToLineFeature(
-        event.geometry,
-        event.id,
-        event.severity,
-        closed
-      );
-      if (lineFeature) {
-        lineLayer.addData(lineFeature);
-      }
+      // Line segment on canvas layer
+      const lineFeature = geometryToLineFeature(event.geometry, event.id, event.severity, closed);
+      if (lineFeature) lineLayer.addData(lineFeature);
 
-      // ── Icon marker at the start of the zone ────────────────────────────
+      // Icon marker at start
       const start = firstCoord(event.geometry);
       if (start) {
         const icon = closed ? createClosureEndpointIcon() : createEventIcon(event.type, event.severity);
@@ -177,7 +181,7 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
         markerGroup.addLayer(m);
       }
 
-      // ── Barrier marker at end of closures ───────────────────────────────
+      // Barrier marker at end of closures
       if (closed) {
         const end = lastCoord(event.geometry);
         if (end) {
@@ -189,7 +193,7 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
     }
   }, [events, visibleRoadTypes, selectEvent]);
 
-  function fetchEvents() {
+  function fetchForZoom() {
     const bounds = map.getBounds();
     const bbox = [
       bounds.getWest(),
@@ -198,23 +202,49 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
       bounds.getNorth(),
     ].join(",");
     const zoom = Math.round(map.getZoom());
-    fetch(`/api/events?bbox=${bbox}&active_only=true&zoom=${zoom}`)
-      .then((r) => r.json())
-      .then((data: { events: RoadEventApiItem[] }) => {
-        onEventsChange(data.events ?? []);
-      })
-      .catch(() => {
-        // Fetch failures are non-fatal; current events remain visible
-      });
+
+    if (zoom < CLUSTER_ZOOM_THRESHOLD) {
+      // Low zoom: fetch server-side clusters, render as count-bubbles
+      const markerGroup = markerGroupRef.current;
+      const lineLayer = lineLayerRef.current;
+      if (!markerGroup || !lineLayer) return;
+
+      fetch(`/api/events/clusters?bbox=${bbox}&zoom=${zoom}`)
+        .then((r) => r.json())
+        .then((data: { clusters: ClusterPoint[] }) => {
+          lineLayer.clearLayers();
+          markerGroup.clearLayers();
+          onEventsChange([]); // no individual events at cluster zoom
+
+          for (const cluster of data.clusters ?? []) {
+            const [lng, lat] = cluster.geometry.coordinates;
+            if (lng === undefined || lat === undefined) continue;
+            const icon = createClusterIcon(cluster.count, cluster.has_critical, cluster.has_warning);
+            const m = L.marker([lat, lng], { icon });
+            markerGroup.addLayer(m);
+          }
+        })
+        .catch(() => {
+          // Non-fatal: keep current view
+        });
+    } else {
+      // High zoom: fetch individual events
+      fetch(`/api/events?bbox=${bbox}&active_only=true&zoom=${zoom}`)
+        .then((r) => r.json())
+        .then((data: { events: RoadEventApiItem[] }) => {
+          onEventsChange(data.events ?? []);
+        })
+        .catch(() => {});
+    }
   }
 
   function scheduleFetch() {
     if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(fetchEvents, 400);
+    debounceTimer.current = setTimeout(fetchForZoom, 400);
   }
 
   useEffect(() => {
-    fetchEvents();
+    fetchForZoom();
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
@@ -223,6 +253,5 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
 
   useMapEvents({ moveend: scheduleFetch });
 
-  // All rendering is handled by native Leaflet layers.
   return null;
 }
