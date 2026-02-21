@@ -49,9 +49,18 @@ export async function GET(
   const bbox = searchParams.get("bbox");
   // active_only defaults to true; pass active_only=false to see expired alerts
   const activeOnly = searchParams.get("active_only") !== "false";
-  const limitRaw = parseInt(searchParams.get("limit") ?? "100", 10);
   const offset = Math.max(0, parseInt(searchParams.get("offset") ?? "0", 10));
-  const limit = Math.min(Math.max(1, isNaN(limitRaw) ? 100 : limitRaw), 500);
+
+  // Zoom-aware density: fewer, higher-severity alerts at low zoom levels where
+  // individual alert polygons are too small to be useful or clickable anyway.
+  // The client passes the current map zoom; callers without zoom get full density.
+  const zoom = parseInt(searchParams.get("zoom") ?? "10", 10);
+  const zoomLimit  = zoom < 5 ? 50  : zoom < 8 ? 150 : 500;
+  const zoomMinSev = zoom < 5 ? "Extreme" : zoom < 8 ? "Severe" : null;
+
+  // Explicit limit param overrides zoom-derived limit (for non-map callers).
+  const limitRaw = parseInt(searchParams.get("limit") ?? String(zoomLimit), 10);
+  const limit = Math.min(Math.max(1, isNaN(limitRaw) ? zoomLimit : limitRaw), 500);
 
   // Build a dynamic WHERE clause using indexed params.
   // Keeping filter params separate from pagination params allows the count
@@ -70,6 +79,18 @@ export async function GET(
     // expires timestamp has passed — the latter handles the window between
     // an alert expiring and the next ingest run deactivating it in the DB.
     conditions.push("wa.is_active = true AND (wa.expires IS NULL OR wa.expires > NOW())");
+  }
+
+  // At very low zoom levels restrict to the most severe alerts only.
+  // An explicit ?severity= param always wins over the zoom-derived floor.
+  if (zoomMinSev && !severity) {
+    const sevOrder: Record<string, number> = { Extreme: 4, Severe: 3, Moderate: 2, Minor: 1 };
+    const minRank = sevOrder[zoomMinSev] ?? 1;
+    const allowed = Object.entries(sevOrder)
+      .filter(([, rank]) => rank >= minRank)
+      .map(([sev]) => sev);
+    const p = addParam(allowed);
+    conditions.push(`wa.severity = ANY(${p}::text[])`);
   }
 
   if (state) {

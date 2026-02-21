@@ -237,7 +237,8 @@ export function RoadEventMarkers({ events, onEventsChange }: Props) {
       bounds.getNorth(),
     ].join(",");
 
-    fetch(`/api/events?bbox=${bbox}&active_only=true&limit=500`)
+    const zoom = Math.round(map.getZoom());
+    fetch(`/api/events?bbox=${bbox}&active_only=true&zoom=${zoom}`)
       .then((r) => r.json())
       .then((data: { events: RoadEventApiItem[] }) => {
         onEventsChange(data.events ?? []);

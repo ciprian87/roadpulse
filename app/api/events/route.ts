@@ -37,9 +37,17 @@ export async function GET(
   const bbox = searchParams.get("bbox");
   // active_only defaults to true; pass active_only=false to include inactive events
   const activeOnly = searchParams.get("active_only") !== "false";
-  const limitRaw = parseInt(searchParams.get("limit") ?? "100", 10);
   const offset = Math.max(0, parseInt(searchParams.get("offset") ?? "0", 10));
-  const limit = Math.min(Math.max(1, isNaN(limitRaw) ? 100 : limitRaw), 500);
+
+  // Zoom-aware density: fewer, higher-severity events at low zoom where individual
+  // road event lines are sub-pixel and impossible to interact with anyway.
+  const zoom = parseInt(searchParams.get("zoom") ?? "10", 10);
+  const zoomLimit  = zoom < 5 ? 50  : zoom < 8 ? 150 : 500;
+  const zoomMinSev = zoom < 5 ? "CRITICAL" : zoom < 8 ? "WARNING" : null;
+
+  // Explicit limit param overrides zoom-derived limit (for non-map callers).
+  const limitRaw = parseInt(searchParams.get("limit") ?? String(zoomLimit), 10);
+  const limit = Math.min(Math.max(1, isNaN(limitRaw) ? zoomLimit : limitRaw), 500);
 
   // Build a dynamic WHERE clause with indexed params.
   // Filter params are kept separate from pagination so the count query can
@@ -60,6 +68,18 @@ export async function GET(
     conditions.push(
       "re.is_active = true AND (re.expected_end_at IS NULL OR re.expected_end_at > NOW())"
     );
+  }
+
+  // At low zoom levels restrict to the most severe events only.
+  // An explicit ?severity= param always wins over the zoom-derived floor.
+  if (zoomMinSev && !severity) {
+    const sevOrder: Record<string, number> = { CRITICAL: 4, WARNING: 3, ADVISORY: 2, INFO: 1 };
+    const minRank = sevOrder[zoomMinSev] ?? 1;
+    const allowed = Object.entries(sevOrder)
+      .filter(([, rank]) => rank >= minRank)
+      .map(([sev]) => sev);
+    const p = addParam(allowed);
+    conditions.push(`re.severity = ANY(${p}::text[])`);
   }
 
   if (state) {

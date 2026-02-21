@@ -69,8 +69,9 @@ export function WeatherAlertMarkers({ alerts, onAlertsChange }: Props) {
       bounds.getEast(),
       bounds.getNorth(),
     ].join(",");
+    const zoom = Math.round(map.getZoom());
 
-    fetch(`/api/weather/alerts?bbox=${bbox}&active_only=true&limit=500`)
+    fetch(`/api/weather/alerts?bbox=${bbox}&active_only=true&zoom=${zoom}`)
       .then((r) => r.json())
       .then((data: { alerts: WeatherAlertApiItem[] }) => {
         onAlertsChange(data.alerts ?? []);
