@@ -424,3 +424,138 @@ export class KsDotWzdxAdapter extends WzdxAdapter {
   readonly state = "KS";
   readonly cacheTtlSeconds = 300;
 }
+
+// ── Phase 4 state adapters — 16 additional states ─────────────────────────────
+// URLs verified Feb 2026 against the USDOT WZDx Feed Registry and live endpoints.
+// All are publicly accessible without a private API key.
+
+export class OhDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "oh-wzdx";
+  // HaulHub/e-dot statewide feed; USDOT registry also lists OhGo API (key required)
+  readonly feedUrl = "https://wzdx.e-dot.com/oh_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "OH";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class PaDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "pa-wzdx";
+  // PennDOT statewide via 511PA (Arcadis). PA Turnpike has a separate key-required feed.
+  readonly feedUrl = "https://511pa.com/api/wzdx";
+  readonly state = "PA";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class VaDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "va-wzdx";
+  // HaulHub/e-dot statewide feed; VDOT SmarterRoads API requires a key
+  readonly feedUrl = "https://wzdx.e-dot.com/va_feed_wzdx_v4.1.geojson";
+  readonly state = "VA";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class OrDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "or-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/or_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "OR";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class MiDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "mi-wzdx";
+  // HaulHub/e-dot statewide feed. MDOT's native API requires a key.
+  readonly feedUrl = "https://wzdx.e-dot.com/mi_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "MI";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class IlDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "il-wzdx";
+  // IDOT statewide via HaulHub; IL Tollway has a separate key-required feed
+  readonly feedUrl = "https://wzdx.e-dot.com/il_feed_wzdx_v4.1.geojson";
+  readonly state = "IL";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class FlDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "fl-wzdx";
+  // FDOT via one.network (WZDx v4.2, ~4800 features). The app_key is a public
+  // embedded key published verbatim in the USDOT Feed Registry — not a secret.
+  readonly feedUrl = "https://us-datacloud.one.network/fdot/feed.json?app_key=c4090b04-26de-c9ee-873b2bd9a38c";
+  readonly state = "FL";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class GaDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "ga-wzdx";
+  // Georgia 511 portal (Arcadis). Not in USDOT registry but confirmed live.
+  readonly feedUrl = "https://511ga.org/api/wzdx";
+  readonly state = "GA";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class TxDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "tx-wzdx";
+  // TxDOT statewide via HaulHub; drivetexas.org API requires a key
+  readonly feedUrl = "https://wzdx.e-dot.com/tx_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "TX";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class AzDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "az-wzdx";
+  // Maricopa County DOT + ADOT highways via AZTech (WZDx v4.2). No key required.
+  readonly feedUrl = "https://wzdxapi.aztech.org/construction";
+  readonly state = "AZ";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class MtDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "mt-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/mdt_feed_wzdx_v4.1.geojson";
+  readonly state = "MT";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class NeDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "ne-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/ne_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "NE";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class WyDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "wy-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/wy_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "WY";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class NhDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "nh-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/nh_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "NH";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class CtDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "ct-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/ct_dot_feed_wzdx_v4.1.geojson";
+  readonly state = "CT";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class TnDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "tn-wzdx";
+  readonly feedUrl = "https://wzdx.e-dot.com/tn_feed_wzdx_v4.1.geojson";
+  readonly state = "TN";
+  readonly cacheTtlSeconds = 300;
+}
+
+export class NvDotWzdxAdapter extends WzdxAdapter {
+  readonly feedName = "nv-wzdx";
+  // Nevada Roads (NDOT via Arcadis) — same platform as WI/ID/NY 511 portals.
+  // Not in USDOT registry but confirmed live with 181 features (WZDx v4.1).
+  readonly feedUrl = "https://www.nvroads.com/api/wzdx";
+  readonly state = "NV";
+  readonly cacheTtlSeconds = 300;
+}

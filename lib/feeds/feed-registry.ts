@@ -18,6 +18,24 @@ import {
   NmDotWzdxAdapter,
   LaDotdWzdxAdapter,
   KsDotWzdxAdapter,
+  // Phase 4 additions
+  OhDotWzdxAdapter,
+  PaDotWzdxAdapter,
+  VaDotWzdxAdapter,
+  OrDotWzdxAdapter,
+  MiDotWzdxAdapter,
+  IlDotWzdxAdapter,
+  FlDotWzdxAdapter,
+  GaDotWzdxAdapter,
+  TxDotWzdxAdapter,
+  AzDotWzdxAdapter,
+  MtDotWzdxAdapter,
+  NeDotWzdxAdapter,
+  WyDotWzdxAdapter,
+  NhDotWzdxAdapter,
+  CtDotWzdxAdapter,
+  TnDotWzdxAdapter,
+  NvDotWzdxAdapter,
 } from "@/lib/feeds/adapters/wzdx-adapter";
 
 /**
@@ -48,6 +66,24 @@ const FEED_REGISTRY: BaseFeedAdapter[] = [
   new NmDotWzdxAdapter(),
   new LaDotdWzdxAdapter(),
   new KsDotWzdxAdapter(),
+  // Phase 4 — 16 additional states
+  new OhDotWzdxAdapter(),
+  new PaDotWzdxAdapter(),
+  new VaDotWzdxAdapter(),
+  new OrDotWzdxAdapter(),
+  new MiDotWzdxAdapter(),
+  new IlDotWzdxAdapter(),
+  new FlDotWzdxAdapter(),
+  new GaDotWzdxAdapter(),
+  new TxDotWzdxAdapter(),
+  new AzDotWzdxAdapter(),
+  new MtDotWzdxAdapter(),
+  new NeDotWzdxAdapter(),
+  new WyDotWzdxAdapter(),
+  new NhDotWzdxAdapter(),
+  new CtDotWzdxAdapter(),
+  new TnDotWzdxAdapter(),
+  new NvDotWzdxAdapter(),
 ];
 
 export function getAllAdapters(): BaseFeedAdapter[] {
