@@ -178,7 +178,7 @@ export abstract class BaseFeedAdapter {
         `[ingest] ${this.feedName}: ${events.length} events in ${totalMs}ms (fetch: ${fetchMs}ms, deactivated: ${deactivated})\n`
       );
 
-      return { upserted, deactivated, fetchMs, total: events.length };
+      return { upserted, deactivated, purged: 0, fetchMs, total: events.length };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
 

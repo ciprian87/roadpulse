@@ -58,12 +58,19 @@ export async function GET(
 
   // Cluster epsilon in degrees — larger at low zoom (more aggressive clustering),
   // tightens as zoom increases so clusters reveal more local detail.
-  // Roughly: zoom 4 ≈ 200km radius, zoom 6 ≈ 50km, zoom 7 ≈ 25km.
+  // Roughly: zoom 4 ≈ 220km, zoom 6 ≈ 55km, zoom 8 ≈ 13km, zoom 9 ≈ 7km.
+  // Clustering now runs through zoom 9 (threshold moved to 10) so we need
+  // explicit values for 8 and 9; the halving pattern from 4-7 continues.
   const epsMap: Record<number, number> = {
+    1: 8.0,
+    2: 5.0,
+    3: 3.0,
     4: 2.0,
     5: 1.0,
     6: 0.5,
     7: 0.25,
+    8: 0.12,
+    9: 0.06,
   };
   const eps = epsMap[zoom] ?? 0.25;
 

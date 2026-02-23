@@ -9,6 +9,7 @@ import { RoadEventMarkers } from "./RoadEventMarkers";
 import { HazardDetailPanel } from "@/components/alerts/HazardDetailPanel";
 import { MapFilterBar } from "./MapFilterBar";
 import { MapLegend } from "./MapLegend";
+import { ZoomTracker, ZoomBadge } from "./ZoomDisplay";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
 
@@ -49,6 +50,7 @@ export default function MapView() {
       <LeafletMapContainer
         center={center}
         zoom={zoom}
+        minZoom={4}
         className="w-full h-full"
         zoomControl={true}
       >
@@ -60,6 +62,7 @@ export default function MapView() {
         />
 
         <GeolocationFly />
+        <ZoomTracker />
 
         <WeatherAlertMarkers alerts={alerts} onAlertsChange={setAlerts} />
         <RoadEventMarkers events={events} onEventsChange={setEvents} />
@@ -71,6 +74,7 @@ export default function MapView() {
       {/* Both overlays live outside the Leaflet DOM — pointer-events passthrough to map */}
       <MapLegend />
       <MapFilterBar />
+      <ZoomBadge />
     </div>
   );
 }

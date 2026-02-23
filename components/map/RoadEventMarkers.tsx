@@ -12,7 +12,10 @@ import { ROAD_TYPE_TO_CATEGORY } from "@/lib/utils/alert-categories";
 
 // Zoom threshold: at or above this zoom show individual events;
 // below it show cluster count-bubbles from the server.
-const CLUSTER_ZOOM_THRESHOLD = 8;
+// 10 keeps clusters active through zoom 8-9 (multi-state/regional views)
+// where the 500-event cap would otherwise only fill with dense east-coast
+// events and leave western states appearing empty.
+const CLUSTER_ZOOM_THRESHOLD = 10;
 
 interface Props {
   events: RoadEventApiItem[];

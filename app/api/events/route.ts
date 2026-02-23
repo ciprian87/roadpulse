@@ -41,9 +41,12 @@ export async function GET(
 
   // Zoom-aware density: fewer, higher-severity events at low zoom where individual
   // road event lines are sub-pixel and impossible to interact with anyway.
+  // Tiers align with CLUSTER_ZOOM_THRESHOLD=10 in RoadEventMarkers — the
+  // individual-events endpoint is only called at zoom ≥ 10 where the viewport
+  // is small enough that 500 events covers any locality without geographic bias.
   const zoom = parseInt(searchParams.get("zoom") ?? "10", 10);
-  const zoomLimit  = zoom < 5 ? 50  : zoom < 8 ? 150 : 500;
-  const zoomMinSev = zoom < 5 ? "CRITICAL" : zoom < 8 ? "WARNING" : null;
+  const zoomLimit  = zoom < 5 ? 50  : zoom < 10 ? 150 : 500;
+  const zoomMinSev = zoom < 5 ? "CRITICAL" : zoom < 10 ? "WARNING" : null;
 
   // Explicit limit param overrides zoom-derived limit (for non-map callers).
   const limitRaw = parseInt(searchParams.get("limit") ?? String(zoomLimit), 10);

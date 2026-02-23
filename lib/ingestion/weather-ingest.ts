@@ -71,6 +71,7 @@ function buildUpsertParams(alert: NormalizedAlert): unknown[] {
 export interface IngestResult {
   upserted: number;
   deactivated: number;
+  purged: number;
   fetchMs: number;
   total: number;
 }
@@ -129,7 +130,10 @@ export async function ingestWeatherAlerts(): Promise<IngestResult> {
     }
     const upserted = alerts.length;
 
-    // Mark any alert that's in the DB but NOT in the latest NWS feed as inactive.
+    // Mark alerts as inactive when either:
+    //   (a) they are no longer present in the latest NWS feed, or
+    //   (b) their expires timestamp has passed (belt-and-suspenders — NWS sometimes
+    //       keeps stale alerts in the active feed past their expiry time).
     // An empty activeNwsIds array deactivates everything, which is correct when
     // NWS returns no road-relevant alerts for the current conditions.
     const activeNwsIds = alerts.map((a) => a.nws_id);
@@ -137,11 +141,24 @@ export async function ingestWeatherAlerts(): Promise<IngestResult> {
       `UPDATE weather_alerts
          SET is_active = false
        WHERE is_active = true
-         AND nws_id != ALL($1::text[])
+         AND (
+           nws_id != ALL($1::text[])
+           OR (expires IS NOT NULL AND expires < NOW())
+         )
        RETURNING id`,
       [activeNwsIds]
     );
     const deactivated = deactivateResult.rowCount ?? 0;
+
+    // Purge records that have been expired for more than 24 hours.
+    // Keeps the table lean while preserving a short window for debugging/auditing.
+    const purgeResult = await client.query<{ id: string }>(
+      `DELETE FROM weather_alerts
+       WHERE expires IS NOT NULL
+         AND expires < NOW() - INTERVAL '24 hours'
+       RETURNING id`
+    );
+    const purged = purgeResult.rowCount ?? 0;
 
     // Record success in feed_status so the UI can show "last updated X minutes ago"
     await client.query(
@@ -160,10 +177,10 @@ export async function ingestWeatherAlerts(): Promise<IngestResult> {
 
     const totalMs = Date.now() - start;
     process.stdout.write(
-      `[ingest] nws-alerts: ${alerts.length} alerts in ${totalMs}ms (fetch: ${fetchMs}ms, deactivated: ${deactivated})\n`
+      `[ingest] nws-alerts: ${alerts.length} alerts in ${totalMs}ms (fetch: ${fetchMs}ms, deactivated: ${deactivated}, purged: ${purged})\n`
     );
 
-    return { upserted, deactivated, fetchMs, total: alerts.length };
+    return { upserted, deactivated, purged, fetchMs, total: alerts.length };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
 
