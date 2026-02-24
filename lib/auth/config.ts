@@ -1,11 +1,14 @@
+// Full NextAuth config for Node.js runtime (API routes, server components).
+// Extends the edge-safe base config with the Credentials provider.
+// Do NOT import this from middleware.ts — use lib/auth/auth.config.ts there.
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { getUserByEmail } from "@/lib/auth/user-repository";
+import { authConfig } from "@/lib/auth/auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  // Fall back to NEXTAUTH_SECRET for backward compatibility with existing .env
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  ...authConfig,
 
   providers: [
     Credentials({
@@ -34,27 +37,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-
-  session: { strategy: "jwt" },
-
-  callbacks: {
-    jwt({ token, user }) {
-      // user is only present on initial sign-in — persist id + role into the JWT
-      if (user) {
-        token.id = user.id as string;
-        token.role = user.role;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      // Expose id + role on the client-accessible session object
-      session.user.id = token.id;
-      session.user.role = token.role;
-      return session;
-    },
-  },
-
-  pages: {
-    signIn: "/account/login",
-  },
 });

@@ -1,29 +1,12 @@
-import { auth } from "@/lib/auth/config";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+// Middleware runs in the Edge runtime — must only import edge-compatible modules.
+// We use the base authConfig (no pg, no bcrypt) with NextAuth's built-in JWT
+// verification. The authorized() callback in authConfig handles the redirect logic.
+import NextAuth from "next-auth";
+import { authConfig } from "@/lib/auth/auth.config";
 
-// Protect /account/* except the auth pages themselves.
-// NextAuth v5 middleware — auth() returns the session or null.
-export default auth(function middleware(req: NextRequest & { auth: unknown }) {
-  const { pathname } = req.nextUrl;
-
-  // Allow unauthenticated access to login and register pages
-  const isAuthPage =
-    pathname === "/account/login" || pathname === "/account/register";
-
-  if (isAuthPage) return NextResponse.next();
-
-  // For all other /account/* routes, redirect to login if not signed in
-  if (!req.auth) {
-    const loginUrl = new URL("/account/login", req.url);
-    loginUrl.searchParams.set("callbackUrl", req.url);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  return NextResponse.next();
-});
+export const { auth: middleware } = NextAuth(authConfig);
+export default middleware;
 
 export const config = {
-  // Only run middleware on /account/* routes
   matcher: ["/account/:path*"],
 };

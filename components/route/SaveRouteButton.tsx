@@ -91,11 +91,11 @@ export function SaveRouteButton({
         Save Route
       </button>
 
-      {/* Modal overlay */}
+      {/* Modal overlay — z-index 2000 sits above Leaflet's highest pane (700) */}
       {dialog !== "closed" && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.6)", zIndex: 2000 }}
           onClick={() => setDialog("closed")}
         >
           <div
