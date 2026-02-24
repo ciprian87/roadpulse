@@ -2,6 +2,7 @@
 
 import { severityToColor } from "@/lib/utils/severity";
 import { nwsEventLabel } from "@/lib/utils/nws-event-labels";
+import { REPORT_TYPE_SHORT } from "@/lib/types/community";
 import type { RouteHazard } from "@/lib/types/route";
 
 // Explicit palette — consistent with HazardDetailPanel approach to avoid CSS
@@ -35,7 +36,7 @@ export function HazardCard({ hazard, isSelected, onClick, darkMode }: HazardCard
 
   // Weather alerts: show the plain-English condition as the title ("Fire Danger",
   // "Winter Storm"…) and the original NWS event type as the subtitle so experts
-  // can still read it. Road events keep their existing type label.
+  // can still read it. Road events and community reports keep their own title.
   const title =
     hazard.kind === "weather_alert"
       ? nwsEventLabel(hazard.event)
@@ -44,6 +45,8 @@ export function HazardCard({ hazard, isSelected, onClick, darkMode }: HazardCard
   const typeLabel =
     hazard.kind === "road_event"
       ? hazard.type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+      : hazard.kind === "community_report"
+      ? REPORT_TYPE_SHORT[hazard.reportType as keyof typeof REPORT_TYPE_SHORT] ?? hazard.reportType
       : hazard.event;
 
   const positionPct = Math.round(hazard.positionAlongRoute * 100);

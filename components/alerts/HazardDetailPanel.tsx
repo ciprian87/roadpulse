@@ -5,6 +5,8 @@ import { BottomSheet } from "@/components/shared/BottomSheet";
 import { severityLabel, severityToColor } from "@/lib/utils/severity";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
+import type { CommunityReportApiItem } from "@/lib/types/community";
+import { REPORT_TYPE_LABELS } from "@/lib/types/community";
 
 // Explicit theme palettes — avoids CSS variable cascade issues inside the
 // Leaflet map container where [data-theme="light"] on <html> doesn't always
@@ -486,6 +488,102 @@ function RoadEventContent({ event, t }: { event: RoadEventApiItem; t: typeof DAR
   );
 }
 
+// ── Community report content ────────────────────────────────────────────────────
+
+function timeAgo(isoString: string): string {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffM = Math.floor(diffMs / 60_000);
+  const diffH = Math.floor(diffM / 60);
+  if (diffM < 2) return "Just now";
+  if (diffM < 60) return `${diffM}m ago`;
+  if (diffH < 24) return `${diffH}h ago`;
+  return `${Math.floor(diffH / 24)}d ago`;
+}
+
+function CommunityContent({ report, t }: { report: CommunityReportApiItem; t: typeof DARK }) {
+  const clearSelection = useMapStore((s) => s.clearSelection);
+  const severityColor = severityToColor(report.severity);
+  const netVotes = report.upvotes - report.downvotes;
+  const typeLabel = REPORT_TYPE_LABELS[report.type] ?? report.type;
+
+  return (
+    <div style={{ backgroundColor: t.bg }}>
+      <div
+        className="px-4 pt-4 pb-3"
+        style={{
+          borderBottom: `1px solid ${t.border}`,
+          background: `linear-gradient(135deg, ${severityColor}18 0%, ${severityColor}06 100%)`,
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{
+                  backgroundColor: `${severityColor}22`,
+                  color: severityColor,
+                  border: `1px solid ${severityColor}55`,
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: severityColor }} />
+                {severityLabel(report.severity)}
+              </span>
+              <span className="text-xs font-medium" style={{ color: t.label }}>{typeLabel}</span>
+            </div>
+            <p className="text-sm font-semibold leading-snug" style={{ color: t.heading }}>
+              {report.title}
+            </p>
+            <p className="text-xs" style={{ color: t.label }}>
+              Reported by driver · {timeAgo(report.created_at)}
+            </p>
+          </div>
+          <button
+            onClick={clearSelection}
+            className="flex-none flex items-center justify-center rounded-full transition-opacity hover:opacity-70"
+            style={{ width: "32px", height: "32px", minWidth: "32px", color: t.label, backgroundColor: t.section, border: `1px solid ${t.border}` }}
+            aria-label="Close report detail"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Vote tally */}
+        <div className="flex items-center gap-3 mt-2.5">
+          <span className="text-xs" style={{ color: "#36cfc9" }}>
+            👍 {report.upvotes}
+          </span>
+          <span className="text-xs" style={{ color: t.label }}>
+            👎 {report.downvotes}
+          </span>
+          {netVotes >= 3 && (
+            <span className="text-xs font-semibold" style={{ color: "#36cfc9" }}>
+              ✅ Verified by drivers
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="px-4 py-4 space-y-3">
+        {report.description && (
+          <Section label="Details" accentColor="#4096ff" t={t}>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: t.body }}>
+              {report.description}
+            </p>
+          </Section>
+        )}
+        {(report.location_description ?? report.route_name) && (
+          <Section label="Location" accentColor={severityColor} t={t}>
+            <p className="text-sm" style={{ color: t.body }}>
+              {[report.location_description, report.route_name].filter(Boolean).join(" · ")}
+            </p>
+          </Section>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Unified panel ──────────────────────────────────────────────────────────────
 
 /** Renders as a right-side panel on desktop and a BottomSheet on mobile */
@@ -501,13 +599,17 @@ export function HazardDetailPanel() {
   const key =
     selectedHazard.kind === "weather"
       ? selectedHazard.alert.id
-      : selectedHazard.event.id;
+      : selectedHazard.kind === "road"
+        ? selectedHazard.event.id
+        : selectedHazard.report.id;
 
   const content =
     selectedHazard.kind === "weather" ? (
       <WeatherContent alert={selectedHazard.alert} t={t} />
-    ) : (
+    ) : selectedHazard.kind === "road" ? (
       <RoadEventContent event={selectedHazard.event} t={t} />
+    ) : (
+      <CommunityContent report={selectedHazard.report} t={t} />
     );
 
   return (

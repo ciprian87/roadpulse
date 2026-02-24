@@ -1,5 +1,10 @@
 import { pool } from "@/lib/db";
-import type { RouteHazard, RoadEventRouteHazard, WeatherAlertRouteHazard } from "@/lib/types/route";
+import type {
+  RouteHazard,
+  RoadEventRouteHazard,
+  WeatherAlertRouteHazard,
+  CommunityReportRouteHazard,
+} from "@/lib/types/route";
 
 // Both NWS and road event severity strings share the same rank scale per CLAUDE.md
 const SEVERITY_RANK: Record<string, number> = {
@@ -47,6 +52,20 @@ interface WeatherAlertRow {
   position_along_route: string;
 }
 
+interface CommunityReportRow {
+  id: string;
+  type: string;
+  title: string;
+  severity: string;
+  description: string | null;
+  location_description: string | null;
+  upvotes: number;
+  downvotes: number;
+  created_at: string;
+  geometry: GeoJSON.Point;
+  position_along_route: string;
+}
+
 /**
  * Queries road events and weather alerts that intersect the corridor polygon,
  * then merges and orders them by their position along the route line.
@@ -60,7 +79,7 @@ export async function findHazardsInCorridor(
 ): Promise<RouteHazard[]> {
   const client = await pool.connect();
   try {
-    const [roadResult, weatherResult] = await Promise.all([
+    const [roadResult, weatherResult, communityResult] = await Promise.all([
       client.query<RoadEventRow>(
         `SELECT
            re.id,
@@ -110,6 +129,32 @@ export async function findHazardsInCorridor(
          LIMIT 200`,
         [corridorGeoJson, routeWkt]
       ),
+      // Community reports: Points intersected with the corridor polygon.
+      // Exclude reports with net votes below -2 (community-flagged as incorrect).
+      client.query<CommunityReportRow>(
+        `SELECT
+           cr.id,
+           cr.type,
+           cr.title,
+           cr.severity,
+           cr.description,
+           cr.location_description,
+           cr.upvotes,
+           cr.downvotes,
+           cr.created_at::text AS created_at,
+           ST_AsGeoJSON(cr.location)::json AS geometry,
+           ST_LineLocatePoint(
+             ST_GeomFromText($2, 4326),
+             cr.location
+           ) AS position_along_route
+         FROM community_reports cr
+         WHERE cr.is_active = true
+           AND (cr.expires_at IS NULL OR cr.expires_at > NOW())
+           AND (cr.upvotes - cr.downvotes) >= -2
+           AND ST_Intersects(cr.location, ST_GeomFromGeoJSON($1))
+         LIMIT 100`,
+        [corridorGeoJson, routeWkt]
+      ),
     ]);
 
     const roadHazards: RoadEventRouteHazard[] = roadResult.rows.map((row) => ({
@@ -148,7 +193,23 @@ export async function findHazardsInCorridor(
       areaDescription: row.area_description,
     }));
 
-    const allHazards: RouteHazard[] = [...roadHazards, ...weatherHazards];
+    const communityHazards: CommunityReportRouteHazard[] = communityResult.rows.map((row) => ({
+      kind: "community_report",
+      id: row.id,
+      severity: row.severity,
+      severityRank: toSeverityRank(row.severity),
+      title: row.title,
+      positionAlongRoute: Number(row.position_along_route),
+      geometry: row.geometry,
+      reportType: row.type,
+      description: row.description,
+      locationDescription: row.location_description,
+      upvotes: Number(row.upvotes),
+      downvotes: Number(row.downvotes),
+      reportedAt: row.created_at,
+    }));
+
+    const allHazards: RouteHazard[] = [...roadHazards, ...weatherHazards, ...communityHazards];
 
     // Primary sort: position along route (0=origin → 1=destination)
     // Tie-break: higher severity rank first

@@ -26,6 +26,7 @@ function buildSummary(hazards: RouteHazard[]): RouteCheckResponse["summary"] {
     ).length,
     roadEventCount: hazards.filter((h) => h.kind === "road_event").length,
     weatherAlertCount: hazards.filter((h) => h.kind === "weather_alert").length,
+    communityReportCount: hazards.filter((h) => h.kind === "community_report").length,
   };
 }
 

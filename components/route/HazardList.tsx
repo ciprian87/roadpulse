@@ -25,7 +25,7 @@ const LIGHT = {
   tabInactiveText: "#7070a0",
 };
 
-type HazardFilter = "weather" | "road" | "both";
+type HazardFilter = "weather" | "road" | "community" | "both";
 
 interface HazardListProps {
   hazards: RouteHazard[];
@@ -62,27 +62,34 @@ export function HazardList({
 
   const weatherCount = hazards.filter((h) => h.kind === "weather_alert").length;
   const roadCount = hazards.filter((h) => h.kind === "road_event").length;
+  const communityCount = hazards.filter((h) => h.kind === "community_report").length;
 
   const filtered = hazards.filter((h) => {
     if (filter === "weather") return h.kind === "weather_alert";
     if (filter === "road") return h.kind === "road_event";
+    if (filter === "community") return h.kind === "community_report";
     return true;
   });
 
   const tabs: Array<{ key: HazardFilter; label: string; count: number }> = [
     { key: "weather", label: "Weather", count: weatherCount },
     { key: "road", label: "511", count: roadCount },
-    { key: "both", label: "Both", count: hazards.length },
+    { key: "community", label: "Drivers", count: communityCount },
+    { key: "both", label: "All", count: hazards.length },
   ];
 
   const emptyMessages: Record<HazardFilter, { main: string; sub: string }> = {
     weather: {
       main: "No weather alerts along this route",
-      sub: roadCount > 0 ? `${roadCount} 511 event${roadCount > 1 ? "s" : ""} found — switch to 511 or Both` : "The corridor is clear",
+      sub: roadCount > 0 ? `${roadCount} 511 event${roadCount > 1 ? "s" : ""} found — switch to 511 or All` : "The corridor is clear",
     },
     road: {
       main: "No 511 events along this route",
-      sub: weatherCount > 0 ? `${weatherCount} weather alert${weatherCount > 1 ? "s" : ""} found — switch to Weather or Both` : "The corridor is clear",
+      sub: weatherCount > 0 ? `${weatherCount} weather alert${weatherCount > 1 ? "s" : ""} found — switch to Weather or All` : "The corridor is clear",
+    },
+    community: {
+      main: "No driver reports along this route",
+      sub: "No community reports have been filed in this corridor",
     },
     both: {
       main: "No hazards along this route",

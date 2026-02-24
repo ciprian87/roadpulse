@@ -54,7 +54,20 @@ export interface WeatherAlertRouteHazard extends BaseRouteHazard {
   areaDescription: string;
 }
 
-export type RouteHazard = RoadEventRouteHazard | WeatherAlertRouteHazard;
+export interface CommunityReportRouteHazard extends BaseRouteHazard {
+  kind: "community_report";
+  reportType: string;
+  description: string | null;
+  locationDescription: string | null;
+  upvotes: number;
+  downvotes: number;
+  reportedAt: string;
+}
+
+export type RouteHazard =
+  | RoadEventRouteHazard
+  | WeatherAlertRouteHazard
+  | CommunityReportRouteHazard;
 
 export interface RouteCheckResponse {
   route: {
@@ -78,6 +91,7 @@ export interface RouteCheckResponse {
     infoCount: number;
     roadEventCount: number;
     weatherAlertCount: number;
+    communityReportCount: number;
   };
   checkedAt: string;
 }

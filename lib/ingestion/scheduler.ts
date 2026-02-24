@@ -1,5 +1,6 @@
 import { ingestWeatherAlerts, type IngestResult } from "./weather-ingest";
 import { getAllAdapters } from "@/lib/feeds/feed-registry";
+import { expireOldReports } from "@/lib/community/report-repository";
 
 export interface SchedulerResult {
   feed: string;
@@ -24,7 +25,16 @@ export async function runAllIngestJobs(): Promise<SchedulerResult[]> {
     results.push({ feed: "nws-alerts", error: message });
   }
 
-  // 2. Road event feed adapters — sequential to avoid DB pool exhaustion.
+  // 2. Community report expiry — deactivate reports past their expires_at timestamp.
+  try {
+    const expired = await expireOldReports();
+    results.push({ feed: "community-reports-expiry", result: { upserted: 0, deactivated: expired, purged: 0, fetchMs: 0, total: expired } });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    results.push({ feed: "community-reports-expiry", error: message });
+  }
+
+  // 3. Road event feed adapters — sequential to avoid DB pool exhaustion.
   // Each adapter catches and records its own failure in feed_status, so a
   // single feed going down does not abort the remaining adapters.
   for (const adapter of getAllAdapters()) {

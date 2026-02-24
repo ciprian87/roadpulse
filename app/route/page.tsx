@@ -13,6 +13,7 @@ import { SaveRouteButton } from "@/components/route/SaveRouteButton";
 import type { RouteHazard } from "@/lib/types/route";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
+import type { CommunityReportApiItem } from "@/lib/types/community";
 
 // Same pattern as app/page.tsx — Leaflet requires browser DOM
 const MapView = dynamic(() => import("@/components/map/MapContainer"), {
@@ -76,6 +77,7 @@ export default function RoutePage() {
   const darkMode = useMapStore((s) => s.darkMode);
   const selectEvent = useMapStore((s) => s.selectEvent);
   const selectAlert = useMapStore((s) => s.selectAlert);
+  const selectCommunityReport = useMapStore((s) => s.selectCommunityReport);
 
   const result = useRouteStore((s) => s.result);
   const selectedHazard = useRouteStore((s) => s.selectedHazard);
@@ -129,7 +131,26 @@ export default function RoutePage() {
     if (centroid) setFlyToTarget(centroid);
 
     // Bridge into map store so the existing HazardDetailPanel opens with full detail UI
-    if (hazard.kind === "road_event") {
+    if (hazard.kind === "community_report") {
+      selectCommunityReport({
+        id: hazard.id,
+        user_id: null,
+        type: hazard.reportType as CommunityReportApiItem["type"],
+        title: hazard.title,
+        description: hazard.description,
+        geometry: hazard.geometry as CommunityReportApiItem["geometry"],
+        location_description: hazard.locationDescription,
+        route_name: null,
+        state: null,
+        severity: hazard.severity,
+        upvotes: hazard.upvotes,
+        downvotes: hazard.downvotes,
+        is_active: true,
+        expires_at: null,
+        created_at: hazard.reportedAt,
+        user_vote: null,
+      } satisfies CommunityReportApiItem);
+    } else if (hazard.kind === "road_event") {
       selectEvent({
         id: hazard.id,
         source_event_id: hazard.id,

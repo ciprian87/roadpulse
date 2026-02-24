@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
+import type { CommunityReportApiItem } from "@/lib/types/community";
 import {
   DEFAULT_VISIBLE_CATEGORIES,
   DEFAULT_VISIBLE_ROAD_TYPES,
@@ -10,7 +11,8 @@ import {
 
 export type SelectedHazard =
   | { kind: "weather"; alert: WeatherAlertApiItem }
-  | { kind: "road"; event: RoadEventApiItem };
+  | { kind: "road"; event: RoadEventApiItem }
+  | { kind: "community"; report: CommunityReportApiItem };
 
 interface MapState {
   center: [number, number];
@@ -28,6 +30,7 @@ interface MapState {
   setZoom: (zoom: number) => void;
   selectAlert: (alert: WeatherAlertApiItem) => void;
   selectEvent: (event: RoadEventApiItem) => void;
+  selectCommunityReport: (report: CommunityReportApiItem) => void;
   clearSelection: () => void;
   toggleDarkMode: () => void;
   toggleCategory: (key: string) => void;
@@ -53,6 +56,9 @@ export const useMapStore = create<MapState>((set) => ({
 
   selectEvent: (event) =>
     set({ selectedHazard: { kind: "road", event }, selectedAlert: null }),
+
+  selectCommunityReport: (report) =>
+    set({ selectedHazard: { kind: "community", report }, selectedAlert: null }),
 
   clearSelection: () => set({ selectedHazard: null, selectedAlert: null }),
 

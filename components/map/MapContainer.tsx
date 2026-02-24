@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css";
 import { useMapStore } from "@/stores/map-store";
 import { WeatherAlertMarkers } from "./WeatherAlertMarkers";
 import { RoadEventMarkers } from "./RoadEventMarkers";
+import { CommunityReportMarkers } from "./CommunityReportMarkers";
 import { RouteLayer } from "./RouteLayer";
 import { HazardDetailPanel } from "@/components/alerts/HazardDetailPanel";
 import { MapFilterBar } from "./MapFilterBar";
@@ -13,6 +14,7 @@ import { MapLegend } from "./MapLegend";
 import { ZoomTracker, ZoomBadge } from "./ZoomDisplay";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
+import type { CommunityReportApiItem } from "@/lib/types/community";
 
 const DARK_TILE =
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
@@ -28,7 +30,15 @@ function GeolocationFly() {
     if (!("geolocation" in navigator)) return;
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        map.flyTo([coords.latitude, coords.longitude], 8, { duration: 1.5 });
+        if (!isFinite(coords.latitude) || !isFinite(coords.longitude)) return;
+        // Guard against the map being unmounted between the position request
+        // and this callback firing (e.g. two MapViews on the same page, or
+        // React Strict Mode double-invocation).
+        try {
+          map.flyTo([coords.latitude, coords.longitude], 8, { duration: 1.5 });
+        } catch {
+          // Map instance no longer valid — ignore
+        }
       },
       () => {
         // Permission denied or unavailable — stay at default center
@@ -44,6 +54,7 @@ export default function MapView() {
   const darkMode = useMapStore((s) => s.darkMode);
   const [alerts, setAlerts] = useState<WeatherAlertApiItem[]>([]);
   const [events, setEvents] = useState<RoadEventApiItem[]>([]);
+  const [communityReports, setCommunityReports] = useState<CommunityReportApiItem[]>([]);
 
   return (
     // Relative container so the desktop HazardDetailPanel can use absolute positioning
@@ -67,6 +78,7 @@ export default function MapView() {
 
         <WeatherAlertMarkers alerts={alerts} onAlertsChange={setAlerts} />
         <RoadEventMarkers events={events} onEventsChange={setEvents} />
+        <CommunityReportMarkers reports={communityReports} onReportsChange={setCommunityReports} />
         <RouteLayer />
       </LeafletMapContainer>
 
