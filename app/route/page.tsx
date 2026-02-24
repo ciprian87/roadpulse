@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { useMapStore } from "@/stores/map-store";
 import { useRouteStore } from "@/stores/route-store";
 import { RouteInput } from "@/components/route/RouteInput";
 import { RouteSummary } from "@/components/route/RouteSummary";
 import { HazardList } from "@/components/route/HazardList";
 import { BottomSheet } from "@/components/shared/BottomSheet";
+import { SaveRouteButton } from "@/components/route/SaveRouteButton";
 import type { RouteHazard } from "@/lib/types/route";
 import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
@@ -79,6 +81,40 @@ export default function RoutePage() {
   const selectedHazard = useRouteStore((s) => s.selectedHazard);
   const setSelectedHazard = useRouteStore((s) => s.setSelectedHazard);
   const setFlyToTarget = useRouteStore((s) => s.setFlyToTarget);
+  const setOriginText = useRouteStore((s) => s.setOriginText);
+  const setOriginCoords = useRouteStore((s) => s.setOriginCoords);
+  const setDestinationText = useRouteStore((s) => s.setDestinationText);
+  const setDestinationCoords = useRouteStore((s) => s.setDestinationCoords);
+  const checkRoute = useRouteStore((s) => s.checkRoute);
+  const originText = useRouteStore((s) => s.originText);
+  const originLat = useRouteStore((s) => s.originLat);
+  const originLng = useRouteStore((s) => s.originLng);
+  const destinationText = useRouteStore((s) => s.destinationText);
+  const destinationLat = useRouteStore((s) => s.destinationLat);
+  const destinationLng = useRouteStore((s) => s.destinationLng);
+
+  const searchParams = useSearchParams();
+
+  // Pre-fill route from URL params when coming from a saved route "Check Now"
+  useEffect(() => {
+    const origin = searchParams.get("origin");
+    const olat = searchParams.get("olat");
+    const olng = searchParams.get("olng");
+    const dest = searchParams.get("dest");
+    const dlat = searchParams.get("dlat");
+    const dlng = searchParams.get("dlng");
+
+    if (origin && dest && olat && olng && dlat && dlng) {
+      setOriginText(origin);
+      setOriginCoords(parseFloat(olat), parseFloat(olng));
+      setDestinationText(dest);
+      setDestinationCoords(parseFloat(dlat), parseFloat(dlng));
+      // Small delay so state settles before the check fires
+      setTimeout(() => void checkRoute(), 50);
+    }
+    // Only run on mount — eslint-disable-next-line is intentional
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Mobile bottom sheet open state — opens when a hazard is tapped
   const [sheetSnap, setSheetSnap] = useState<"peek" | "half" | "full">("peek");
@@ -146,6 +182,19 @@ export default function RoutePage() {
   const resultPanel = result ? (
     <>
       <RouteSummary route={result.route} summary={result.summary} darkMode={darkMode} />
+      {/* Save Route — only shown after a successful check with valid coords */}
+      {originLat !== null && originLng !== null && destinationLat !== null && destinationLng !== null && (
+        <div className="px-3 pb-3">
+          <SaveRouteButton
+            originAddress={originText}
+            originLat={originLat}
+            originLng={originLng}
+            destinationAddress={destinationText}
+            destinationLat={destinationLat}
+            destinationLng={destinationLng}
+          />
+        </div>
+      )}
       <HazardList
         hazards={result.hazards}
         selectedHazardId={selectedHazard?.id ?? null}

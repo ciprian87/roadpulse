@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useMapStore } from "@/stores/map-store";
 
 // Nav items shared by mobile bottom bar and desktop sidebar
@@ -17,6 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const darkMode = useMapStore((s) => s.darkMode);
   const toggleDarkMode = useMapStore((s) => s.toggleDarkMode);
   const pathname = usePathname();
+  const { data: session } = useSession();
 
   // Sync dark/light theme attribute on <html>
   useEffect(() => {
@@ -48,18 +50,46 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span>RoadPulse</span>
         </Link>
 
-        <button
-          onClick={toggleDarkMode}
-          className="flex items-center justify-center rounded-lg transition-colors"
-          style={{
-            width: "44px",
-            height: "44px",
-            color: "var(--rp-text-muted)",
-          }}
-          aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {darkMode ? <SunIcon /> : <MoonIcon />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleDarkMode}
+            className="flex items-center justify-center rounded-lg transition-colors"
+            style={{ width: "44px", height: "44px", color: "var(--rp-text-muted)" }}
+            aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {darkMode ? <SunIcon /> : <MoonIcon />}
+          </button>
+
+          {/* Show user initial or Sign In link */}
+          {session ? (
+            <Link
+              href="/account"
+              className="flex items-center justify-center rounded-full font-semibold text-sm"
+              style={{
+                width: "36px",
+                height: "36px",
+                backgroundColor: "color-mix(in srgb, var(--rp-info) 20%, transparent)",
+                color: "var(--rp-info)",
+              }}
+              aria-label="Your account"
+            >
+              {(session.user.name ?? session.user.email).charAt(0).toUpperCase()}
+            </Link>
+          ) : (
+            <Link
+              href="/account/login"
+              className="flex items-center justify-center rounded-lg text-xs font-semibold px-3 transition-colors"
+              style={{
+                height: "36px",
+                backgroundColor: "color-mix(in srgb, var(--rp-info) 15%, transparent)",
+                border: "1px solid color-mix(in srgb, var(--rp-info) 30%, transparent)",
+                color: "var(--rp-info)",
+              }}
+            >
+              Sign In
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* ── Main area: sidebar (desktop) + content ── */}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import { AppShell } from "@/components/shared/AppShell";
+import { SessionProviderWrapper } from "@/components/shared/SessionProviderWrapper";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -29,7 +30,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${dmSans.variable} ${jetbrainsMono.variable}`}>
       <body className="antialiased">
-        <AppShell>{children}</AppShell>
+        <SessionProviderWrapper>
+          <AppShell>{children}</AppShell>
+        </SessionProviderWrapper>
       </body>
     </html>
   );
