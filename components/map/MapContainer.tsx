@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css";
 import { useMapStore } from "@/stores/map-store";
 import { WeatherAlertMarkers } from "./WeatherAlertMarkers";
 import { RoadEventMarkers } from "./RoadEventMarkers";
+import { RouteLayer } from "./RouteLayer";
 import { HazardDetailPanel } from "@/components/alerts/HazardDetailPanel";
 import { MapFilterBar } from "./MapFilterBar";
 import { MapLegend } from "./MapLegend";
@@ -66,6 +67,7 @@ export default function MapView() {
 
         <WeatherAlertMarkers alerts={alerts} onAlertsChange={setAlerts} />
         <RoadEventMarkers events={events} onEventsChange={setEvents} />
+        <RouteLayer />
       </LeafletMapContainer>
 
       {/* HazardDetailPanel lives outside the Leaflet DOM so it can overlay freely */}

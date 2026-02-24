@@ -51,10 +51,6 @@ export async function GET(
   const activeOnly = searchParams.get("active_only") !== "false";
   const offset = Math.max(0, parseInt(searchParams.get("offset") ?? "0", 10));
 
-  // Zoom-aware density: fewer, higher-severity alerts at low zoom levels where
-  // individual alert polygons are too small to be useful or clickable anyway.
-  // The client passes the current map zoom; callers without zoom get full density.
-  const zoom = parseInt(searchParams.get("zoom") ?? "10", 10);
   // Weather alert polygons are large regional features, not dense point markers,
   // so there is no rendering reason to reduce the limit at low zoom.
   // Use a flat 500 cap at all zoom levels; the bbox filter already spatially
