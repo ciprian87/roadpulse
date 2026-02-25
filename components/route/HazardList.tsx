@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { HazardCard } from "./HazardCard";
+import { SkeletonCard } from "@/components/shared/SkeletonCard";
 import type { RouteHazard } from "@/lib/types/route";
 
 const DARK = {
@@ -32,6 +33,7 @@ interface HazardListProps {
   selectedHazardId: string | null;
   onSelectHazard: (hazard: RouteHazard) => void;
   darkMode: boolean;
+  loading?: boolean;
 }
 
 function ClearIcon() {
@@ -56,9 +58,20 @@ export function HazardList({
   selectedHazardId,
   onSelectHazard,
   darkMode,
+  loading = false,
 }: HazardListProps) {
   const t = darkMode ? DARK : LIGHT;
   const [filter, setFilter] = useState<HazardFilter>("weather");
+
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-2 px-3 pb-4 pt-2">
+        <SkeletonCard lines={3} />
+        <SkeletonCard lines={2} />
+        <SkeletonCard lines={3} />
+      </div>
+    );
+  }
 
   const weatherCount = hazards.filter((h) => h.kind === "weather_alert").length;
   const roadCount = hazards.filter((h) => h.kind === "road_event").length;

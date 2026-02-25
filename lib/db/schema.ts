@@ -135,6 +135,9 @@ export const users = pgTable("users", {
   // Enum-like: driver | dispatcher | admin
   role: varchar("role", { length: 20 }).default("driver").notNull(),
   preferences: jsonb("preferences").default(sql`'{}'::jsonb`),
+  // Activity tracking (added in migration 0004)
+  is_active: boolean("is_active").default(true),
+  last_active_at: timestamp("last_active_at", { withTimezone: true }),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -191,6 +194,11 @@ export const communityReports = pgTable(
     downvotes: integer("downvotes").default(0).notNull(),
     is_active: boolean("is_active").default(true).notNull(),
     expires_at: timestamp("expires_at", { withTimezone: true }),
+    // Moderation columns (added in migration 0004)
+    moderation_status: varchar("moderation_status", { length: 20 }).default("pending"),
+    moderated_by: uuid("moderated_by").references(() => users.id, { onDelete: "set null" }),
+    moderated_at: timestamp("moderated_at", { withTimezone: true }),
+    moderation_reason: text("moderation_reason"),
     created_at: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -213,9 +221,59 @@ export const feedStatus = pgTable("feed_status", {
   avg_fetch_ms: integer("avg_fetch_ms"),
   // Enum-like: healthy | degraded | down | unknown
   status: varchar("status", { length: 20 }).default("unknown").notNull(),
+  // Scheduler control (added in migration 0004)
+  is_enabled: boolean("is_enabled").default(true),
+  refresh_interval_minutes: integer("refresh_interval_minutes").default(5),
   updated_at: timestamp("updated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
+});
+
+// Admin tables (added in migration 0004)
+
+export const usageEvents = pgTable(
+  "usage_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    event_type: varchar("event_type", { length: 50 }).notNull(),
+    metadata: jsonb("metadata").default(sql`'{}'::jsonb`),
+    user_id: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_usage_events_type").on(table.event_type),
+    index("idx_usage_events_created").on(table.created_at),
+    index("idx_usage_events_user").on(table.user_id),
+  ]
+);
+
+export const ingestionLogs = pgTable(
+  "ingestion_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    feed_name: varchar("feed_name", { length: 100 }).notNull(),
+    // success | partial | failed
+    status: varchar("status", { length: 20 }).notNull(),
+    duration_ms: integer("duration_ms"),
+    records_inserted: integer("records_inserted").default(0),
+    records_updated: integer("records_updated").default(0),
+    records_deactivated: integer("records_deactivated").default(0),
+    records_errored: integer("records_errored").default(0),
+    error_message: text("error_message"),
+    data_hash: varchar("data_hash", { length: 64 }),
+    created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  },
+  (table) => [
+    index("idx_ingestion_logs_feed").on(table.feed_name, table.created_at),
+    index("idx_ingestion_logs_created").on(table.created_at),
+  ]
+);
+
+export const appSettings = pgTable("app_settings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: jsonb("value").notNull(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  updated_by: uuid("updated_by").references(() => users.id),
 });
 
 // Re-export table types for use in service/repository layers
@@ -233,3 +291,9 @@ export type CommunityReport = typeof communityReports.$inferSelect;
 export type NewCommunityReport = typeof communityReports.$inferInsert;
 export type FeedStatus = typeof feedStatus.$inferSelect;
 export type NewFeedStatus = typeof feedStatus.$inferInsert;
+export type UsageEvent = typeof usageEvents.$inferSelect;
+export type NewUsageEvent = typeof usageEvents.$inferInsert;
+export type IngestionLog = typeof ingestionLogs.$inferSelect;
+export type NewIngestionLog = typeof ingestionLogs.$inferInsert;
+export type AppSetting = typeof appSettings.$inferSelect;
+export type NewAppSetting = typeof appSettings.$inferInsert;

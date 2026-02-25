@@ -9,11 +9,14 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:migrate": "tsx --env-file=.env lib/db/migrate.ts",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "admin:promote": "tsx --env-file=.env scripts/admin-promote.ts"
   },
   "dependencies": {
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@types/leaflet": "^1.9.21",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^5.70.1",
     "drizzle-orm": "^0.45.1",
     "ioredis": "^5.9.3",
     "leaflet": "^1.9.4",
@@ -24,6 +27,7 @@
     "react-dom": "19.2.3",
     "react-leaflet": "^5.0.0",
     "react-leaflet-cluster": "^4.0.0",
+    "recharts": "^3.7.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {

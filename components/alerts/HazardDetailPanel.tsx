@@ -7,6 +7,7 @@ import type { WeatherAlertApiItem } from "@/lib/types/weather";
 import type { RoadEventApiItem } from "@/lib/types/road-event";
 import type { CommunityReportApiItem } from "@/lib/types/community";
 import { REPORT_TYPE_LABELS } from "@/lib/types/community";
+import type { ParkingFacilityApiItem } from "@/lib/types/parking";
 
 // Explicit theme palettes — avoids CSS variable cascade issues inside the
 // Leaflet map container where [data-theme="light"] on <html> doesn't always
@@ -584,6 +585,126 @@ function CommunityContent({ report, t }: { report: CommunityReportApiItem; t: ty
   );
 }
 
+// ── Parking facility content ───────────────────────────────────────────────────
+
+function availabilityColor(available: number | null, total: number | null): string {
+  if (available === null || total === null || total === 0) return "#4096ff";
+  const ratio = available / total;
+  if (ratio > 0.5) return "#36cfc9";
+  if (ratio >= 0.25) return "#ffd000";
+  return "#ff4d4f";
+}
+
+const TREND_LABELS: Record<string, string> = {
+  FILLING: "Filling up",
+  CLEARING: "Clearing out",
+  STABLE: "Stable",
+};
+
+function ParkingContent({ facility, t }: { facility: ParkingFacilityApiItem; t: typeof DARK }) {
+  const clearSelection = useMapStore((s) => s.clearSelection);
+  const avColor = availabilityColor(facility.available_spaces, facility.total_spaces);
+
+  return (
+    <div style={{ backgroundColor: t.bg }}>
+      <div
+        className="px-4 pt-4 pb-3"
+        style={{
+          borderBottom: `1px solid ${t.border}`,
+          background: `linear-gradient(135deg, ${avColor}18 0%, ${avColor}06 100%)`,
+        }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full"
+                style={{
+                  backgroundColor: `${avColor}22`,
+                  color: avColor,
+                  border: `1px solid ${avColor}55`,
+                }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: avColor }} />
+                Truck Parking
+              </span>
+              {facility.highway && (
+                <span className="text-xs font-medium" style={{ color: t.label }}>
+                  {facility.highway}{facility.direction ? ` ${facility.direction}` : ""}
+                </span>
+              )}
+            </div>
+            <p className="text-sm font-semibold leading-snug" style={{ color: t.heading }}>
+              {facility.name}
+            </p>
+            <p className="text-xs" style={{ color: t.label }}>{facility.state}</p>
+          </div>
+          <button
+            onClick={clearSelection}
+            className="flex-none flex items-center justify-center rounded-full transition-opacity hover:opacity-70"
+            style={{ width: "32px", height: "32px", minWidth: "32px", color: t.label, backgroundColor: t.section, border: `1px solid ${t.border}` }}
+            aria-label="Close parking detail"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      </div>
+
+      <div className="px-4 py-4 space-y-3">
+        {/* Availability */}
+        <Section label="Availability" accentColor={avColor} t={t}>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="text-2xl font-bold" style={{ color: avColor }}>
+                {facility.available_spaces ?? "—"}
+              </p>
+              <p className="text-xs" style={{ color: t.label }}>
+                available of {facility.total_spaces ?? "?"} spaces
+              </p>
+            </div>
+            {facility.trend && (
+              <span
+                className="text-xs font-semibold px-2.5 py-1 rounded-full"
+                style={{ backgroundColor: `${avColor}22`, color: avColor, border: `1px solid ${avColor}44` }}
+              >
+                {TREND_LABELS[facility.trend] ?? facility.trend}
+              </span>
+            )}
+          </div>
+        </Section>
+
+        {/* Amenities */}
+        {facility.amenities.length > 0 && (
+          <Section label="Amenities" accentColor="#4096ff" t={t}>
+            <div className="flex flex-wrap gap-1.5">
+              {facility.amenities.map((a) => (
+                <span
+                  key={a}
+                  className="text-xs px-2 py-0.5 rounded"
+                  style={{ backgroundColor: t.section, color: t.body, border: `1px solid ${t.border}` }}
+                >
+                  {a}
+                </span>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Last updated */}
+        {facility.last_updated_at && (
+          <p className="text-xs" style={{ color: t.label }}>
+            Updated {new Date(facility.last_updated_at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+          </p>
+        )}
+
+        <p className="text-xs pb-2" style={{ color: t.label }}>
+          Source: MAASTO TPIMS
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // ── Unified panel ──────────────────────────────────────────────────────────────
 
 /** Renders as a right-side panel on desktop and a BottomSheet on mobile */
@@ -601,15 +722,19 @@ export function HazardDetailPanel() {
       ? selectedHazard.alert.id
       : selectedHazard.kind === "road"
         ? selectedHazard.event.id
-        : selectedHazard.report.id;
+        : selectedHazard.kind === "community"
+          ? selectedHazard.report.id
+          : selectedHazard.facility.id;
 
   const content =
     selectedHazard.kind === "weather" ? (
       <WeatherContent alert={selectedHazard.alert} t={t} />
     ) : selectedHazard.kind === "road" ? (
       <RoadEventContent event={selectedHazard.event} t={t} />
-    ) : (
+    ) : selectedHazard.kind === "community" ? (
       <CommunityContent report={selectedHazard.report} t={t} />
+    ) : (
+      <ParkingContent facility={selectedHazard.facility} t={t} />
     );
 
   return (

@@ -6,6 +6,7 @@ import {
   isWithinUS,
 } from "@/lib/community/report-repository";
 import { checkReportRateLimit } from "@/lib/community/rate-limit";
+import { logUsageEvent } from "@/lib/admin/usage-repository";
 import type { CommunityReportType } from "@/lib/types/community";
 
 const VALID_TYPES = new Set<CommunityReportType>([
@@ -117,6 +118,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     state,
     severity: resolvedSeverity,
   });
+
+  await logUsageEvent(
+    "REPORT_SUBMIT",
+    { reportType: type, state: state ?? null, severity: resolvedSeverity },
+    session.user.id
+  ).catch(() => undefined);
 
   return NextResponse.json({ report }, { status: 201 });
 }

@@ -2,6 +2,8 @@ import { pool } from "@/lib/db/index";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
 import { fetchRawAlerts, parseAlerts, type NormalizedAlert } from "@/lib/weather/nws";
 import { fetchZoneGeometryMap, mergeToMultiPolygon } from "@/lib/weather/zone-resolver";
+import { logIngestionRun } from "@/lib/admin/ingestion-repository";
+import { logUsageEvent } from "@/lib/admin/usage-repository";
 
 const CACHE_KEY = "nws:alerts:raw";
 const CACHE_TTL_SECONDS = 120; // 2 minutes — matches NWS rate limit guidance
@@ -180,6 +182,22 @@ export async function ingestWeatherAlerts(): Promise<IngestResult> {
       `[ingest] nws-alerts: ${alerts.length} alerts in ${totalMs}ms (fetch: ${fetchMs}ms, deactivated: ${deactivated}, purged: ${purged})\n`
     );
 
+    await logIngestionRun({
+      feed_name: FEED_NAME,
+      status: "success",
+      duration_ms: totalMs,
+      records_inserted: upserted,
+      records_deactivated: deactivated,
+    }).catch(() => undefined);
+
+    await logUsageEvent("FEED_INGEST", {
+      feedName: FEED_NAME,
+      records: alerts.length,
+      deactivated,
+      purged,
+      duration_ms: totalMs,
+    }).catch(() => undefined);
+
     return { upserted, deactivated, purged, fetchMs, total: alerts.length };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -198,6 +216,20 @@ export async function ingestWeatherAlerts(): Promise<IngestResult> {
         [FEED_NAME, NWS_ALERTS_URL, message]
       )
       .catch(() => undefined); // Don't mask the original error
+
+    const errorTotalMs = Date.now() - start;
+    await logIngestionRun({
+      feed_name: FEED_NAME,
+      status: "failed",
+      duration_ms: errorTotalMs,
+      error_message: message,
+    }).catch(() => undefined);
+
+    await logUsageEvent("FEED_ERROR", {
+      feedName: FEED_NAME,
+      error: message,
+      duration_ms: errorTotalMs,
+    }).catch(() => undefined);
 
     throw err;
   } finally {

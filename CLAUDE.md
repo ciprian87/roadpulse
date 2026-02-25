@@ -194,6 +194,13 @@ type Hazard = RoadEventHazard | WeatherAlertHazard | CommunityReportHazard;
 - OpenRouteService: 2000 requests/day on free tier, cache route results aggressively
 - State 511 APIs: varies, respect `Retry-After` headers, 10-60 second polling floors
 
+### Admin Panel
+
+- Admin pages are desktop-only — no mobile layout required.
+- All admin actions that modify data must log to the `usage_events` table for audit trail.
+- Admin API endpoints live under `/api/admin/` and require `role: 'admin'` auth check.
+- Configurable settings (TTLs, thresholds, intervals) read from the `app_settings` table with hardcoded fallback defaults.
+
 ---
 
 ## T — Tools and Dependencies
@@ -218,7 +225,9 @@ type Hazard = RoadEventHazard | WeatherAlertHazard | CommunityReportHazard;
 
 ```
 app/              → Pages and API route handlers (thin — delegates to /lib/)
+  admin/          → Admin dashboard (desktop-only, role-protected)
 components/       → React UI components (map/, route/, alerts/, community/, shared/)
+  admin/          → Admin-specific components (StatCard, DataTable, ActivityFeed, etc.)
 lib/              → Core business logic (feeds/, ingestion/, geo/, weather/, db/, cache/)
 stores/           → Zustand stores (map, route, filters)
 public/           → PWA manifest, icons, service worker

@@ -1,5 +1,7 @@
 import { pool } from "@/lib/db/index";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { logIngestionRun } from "@/lib/admin/ingestion-repository";
+import { logUsageEvent } from "@/lib/admin/usage-repository";
 import type { IngestResult } from "@/lib/ingestion/weather-ingest";
 
 /**
@@ -178,6 +180,22 @@ export abstract class BaseFeedAdapter {
         `[ingest] ${this.feedName}: ${events.length} events in ${totalMs}ms (fetch: ${fetchMs}ms, deactivated: ${deactivated})\n`
       );
 
+      // Non-fatal audit writes — a logging failure must never fail an ingestion run
+      await logIngestionRun({
+        feed_name: this.feedName,
+        status: "success",
+        duration_ms: totalMs,
+        records_inserted: upserted,
+        records_deactivated: deactivated,
+      }).catch(() => undefined);
+
+      await logUsageEvent("FEED_INGEST", {
+        feedName: this.feedName,
+        records: events.length,
+        deactivated,
+        duration_ms: totalMs,
+      }).catch(() => undefined);
+
       return { upserted, deactivated, purged: 0, fetchMs, total: events.length };
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -195,6 +213,20 @@ export abstract class BaseFeedAdapter {
           [this.feedName, this.feedUrl, message]
         )
         .catch(() => undefined);
+
+      const errorTotalMs = Date.now() - start;
+      await logIngestionRun({
+        feed_name: this.feedName,
+        status: "failed",
+        duration_ms: errorTotalMs,
+        error_message: message,
+      }).catch(() => undefined);
+
+      await logUsageEvent("FEED_ERROR", {
+        feedName: this.feedName,
+        error: message,
+        duration_ms: errorTotalMs,
+      }).catch(() => undefined);
 
       throw err;
     } finally {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/index";
+import { checkRateLimit, getClientIp } from "@/lib/middleware/rate-limit";
 
 interface AlertRow {
   id: string;
@@ -41,6 +42,15 @@ interface AlertsResponse {
 export async function GET(
   request: NextRequest
 ): Promise<NextResponse<AlertsResponse | { error: string; code: string }>> {
+  const ip = getClientIp(request);
+  const rl = await checkRateLimit(`rl:weather:${ip}`, 60, 60).catch(() => ({ allowed: true, remaining: 60, retryAfter: 0 }));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded", code: "RATE_LIMITED", retryAfter: rl.retryAfter },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = request.nextUrl;
 
   const state = searchParams.get("state");

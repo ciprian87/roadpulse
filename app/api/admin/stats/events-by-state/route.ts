@@ -1,0 +1,16 @@
+import { NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth-guard";
+import { getEventsByState } from "@/lib/admin/usage-repository";
+
+export async function GET(): Promise<NextResponse> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  try {
+    const data = await getEventsByState();
+    return NextResponse.json({ data });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "QUERY_FAILED";
+    return NextResponse.json({ error: msg, code: "INTERNAL_ERROR" }, { status: 500 });
+  }
+}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getUserByEmail, createUser } from "@/lib/auth/user-repository";
+import { logUsageEvent } from "@/lib/admin/usage-repository";
 
 interface RegisterBody {
   email: string;
@@ -59,6 +60,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const password_hash = await bcrypt.hash(password, 12);
 
   await createUser({ email: email.toLowerCase(), password_hash, name: name.trim() });
+
+  await logUsageEvent("USER_REGISTER", { email: email.toLowerCase() }).catch(() => undefined);
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

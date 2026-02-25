@@ -1,8 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { WeatherAlertApiItem, WeatherAlertsApiResponse } from "@/lib/types/weather";
 import { SEVERITY_COLOR, severityLabel } from "@/lib/utils/severity";
 import { FilterBar } from "./FilterBar";
+
+export const metadata: Metadata = {
+  title: "Weather Alerts",
+};
 
 // Always show live data — no ISR caching for the alerts list
 export const revalidate = 0;

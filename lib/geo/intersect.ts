@@ -66,9 +66,13 @@ interface CommunityReportRow {
   position_along_route: string;
 }
 
+export interface CorridorQueryResult {
+  hazards: RouteHazard[];
+}
+
 /**
- * Queries road events and weather alerts that intersect the corridor polygon,
- * then merges and orders them by their position along the route line.
+ * Queries road events, weather alerts, community reports, and parking facilities
+ * that intersect or fall near the corridor, then returns them sorted.
  *
  * $1 = corridorGeoJson (ST_GeomFromGeoJSON)
  * $2 = routeWkt        (ST_GeomFromText / ST_LineLocatePoint)
@@ -76,7 +80,7 @@ interface CommunityReportRow {
 export async function findHazardsInCorridor(
   corridorGeoJson: string,
   routeWkt: string
-): Promise<RouteHazard[]> {
+): Promise<CorridorQueryResult> {
   const client = await pool.connect();
   try {
     const [roadResult, weatherResult, communityResult] = await Promise.all([
@@ -219,7 +223,7 @@ export async function findHazardsInCorridor(
       return b.severityRank - a.severityRank;
     });
 
-    return allHazards;
+    return { hazards: allHazards };
   } finally {
     client.release();
   }

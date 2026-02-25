@@ -52,6 +52,13 @@ export function AppShell({ children }: { children: ReactNode }) {
         </Link>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/data-sources"
+            className="hidden md:flex items-center text-xs px-2 py-1 rounded transition-colors"
+            style={{ color: "var(--rp-text-muted)" }}
+          >
+            Data Sources
+          </Link>
           <button
             onClick={toggleDarkMode}
             className="flex items-center justify-center rounded-lg transition-colors"

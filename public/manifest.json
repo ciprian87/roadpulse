@@ -1,0 +1,36 @@
+{
+  "name": "RoadPulse",
+  "short_name": "RoadPulse",
+  "description": "Real-time road closures, weather alerts, and hazards for commercial truck drivers.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0c0f14",
+  "theme_color": "#0c0f14",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Check Route",
+      "url": "/route",
+      "description": "Check hazards along a route"
+    },
+    {
+      "name": "Weather Alerts",
+      "url": "/alerts",
+      "description": "View active weather alerts"
+    }
+  ]
+}

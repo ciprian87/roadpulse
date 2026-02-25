@@ -1,6 +1,7 @@
 import { ingestWeatherAlerts, type IngestResult } from "./weather-ingest";
 import { getAllAdapters } from "@/lib/feeds/feed-registry";
 import { expireOldReports } from "@/lib/community/report-repository";
+import { pool } from "@/lib/db";
 
 export interface SchedulerResult {
   feed: string;
@@ -37,7 +38,27 @@ export async function runAllIngestJobs(): Promise<SchedulerResult[]> {
   // 3. Road event feed adapters — sequential to avoid DB pool exhaustion.
   // Each adapter catches and records its own failure in feed_status, so a
   // single feed going down does not abort the remaining adapters.
+  // Adapters with is_enabled = false in feed_status are skipped.
+  let disabledFeeds: Set<string> = new Set();
+  try {
+    const client = await pool.connect();
+    try {
+      const res = await client.query<{ feed_name: string }>(
+        "SELECT feed_name FROM feed_status WHERE is_enabled = false"
+      );
+      disabledFeeds = new Set(res.rows.map((r) => r.feed_name));
+    } finally {
+      client.release();
+    }
+  } catch {
+    // Non-fatal — if we can't read disabled list, run all adapters
+  }
+
   for (const adapter of getAllAdapters()) {
+    if (disabledFeeds.has(adapter.feedName)) {
+      results.push({ feed: adapter.feedName, error: "Skipped: feed is disabled" });
+      continue;
+    }
     try {
       const result = await adapter.ingest();
       results.push({ feed: adapter.feedName, result });

@@ -31,7 +31,7 @@ export default function AccountPage() {
       style={{ backgroundColor: "var(--rp-bg)" }}
     >
       <div className="max-w-2xl mx-auto flex flex-col gap-6">
-        <AccountHeader name={session.user.name} email={session.user.email} />
+        <AccountHeader name={session.user.name} email={session.user.email} isAdmin={session.user.role === "admin"} />
         <SavedRoutesSection />
         <PreferencesSection />
       </div>
@@ -41,13 +41,14 @@ export default function AccountPage() {
 
 /* ─── Account Header ──────────────────────────────────────────────────────── */
 
-function AccountHeader({ name, email }: { name: string | null; email: string }) {
+function AccountHeader({ name, email, isAdmin }: { name: string | null; email: string; isAdmin: boolean }) {
+  const router = useRouter();
   return (
     <div
-      className="rounded-2xl p-5 flex items-center justify-between"
+      className="rounded-2xl p-5 flex items-center justify-between gap-3"
       style={{ backgroundColor: "var(--rp-surface)", border: "1px solid var(--rp-border)" }}
     >
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0">
         {/* Avatar initial */}
         <div
           className="rounded-full flex items-center justify-center font-bold text-lg flex-none"
@@ -60,26 +61,42 @@ function AccountHeader({ name, email }: { name: string | null; email: string }) 
         >
           {(name ?? email).charAt(0).toUpperCase()}
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="font-semibold" style={{ color: "var(--rp-text)" }}>
             {name ?? "Driver"}
           </p>
-          <p className="text-sm" style={{ color: "var(--rp-text-muted)" }}>
+          <p className="text-sm truncate" style={{ color: "var(--rp-text-muted)" }}>
             {email}
           </p>
         </div>
       </div>
-      <button
-        onClick={() => signOut({ callbackUrl: "/" })}
-        className="text-sm font-medium rounded-lg px-4 transition-colors"
-        style={{
-          height: "36px",
-          border: "1px solid var(--rp-border)",
-          color: "var(--rp-text-muted)",
-        }}
-      >
-        Sign out
-      </button>
+      <div className="flex items-center gap-2 flex-none">
+        {isAdmin && (
+          <button
+            onClick={() => router.push("/admin")}
+            className="text-sm font-medium rounded-lg px-3 transition-colors"
+            style={{
+              height: "36px",
+              backgroundColor: "color-mix(in srgb, var(--rp-warning) 15%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--rp-warning) 40%, transparent)",
+              color: "var(--rp-warning)",
+            }}
+          >
+            Admin Panel
+          </button>
+        )}
+        <button
+          onClick={() => signOut({ callbackUrl: "/" })}
+          className="text-sm font-medium rounded-lg px-4 transition-colors"
+          style={{
+            height: "36px",
+            border: "1px solid var(--rp-border)",
+            color: "var(--rp-text-muted)",
+          }}
+        >
+          Sign out
+        </button>
+      </div>
     </div>
   );
 }

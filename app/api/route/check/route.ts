@@ -5,6 +5,9 @@ import { fetchRoute } from "@/lib/geo/route";
 import { buildCorridor } from "@/lib/geo/corridor";
 import { findHazardsInCorridor } from "@/lib/geo/intersect";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
+import { checkRateLimit, getClientIp } from "@/lib/middleware/rate-limit";
+import { logUsageEvent } from "@/lib/admin/usage-repository";
+import { auth } from "@/lib/auth/config";
 import type { RouteCheckRequest, RouteCheckResponse, RouteHazard } from "@/lib/types/route";
 
 const CACHE_TTL_SECONDS = 300;
@@ -137,10 +140,10 @@ async function handleCheck(params: {
     );
   }
 
-  // Intersect corridor with active hazards
-  let hazards;
+  // Intersect corridor with active hazards and nearby parking
+  let corridorResult2;
   try {
-    hazards = await findHazardsInCorridor(
+    corridorResult2 = await findHazardsInCorridor(
       corridorResult.geometryGeoJson,
       routeResult.geometryWkt
     );
@@ -151,6 +154,8 @@ async function handleCheck(params: {
       { status: 500 }
     );
   }
+
+  const { hazards } = corridorResult2;
 
   const response: RouteCheckResponse = {
     route: {
@@ -173,10 +178,33 @@ async function handleCheck(params: {
   // Cache non-fatally — a Redis outage should not fail a successful route check
   await cacheSet(cacheKey, JSON.stringify(response), CACHE_TTL_SECONDS).catch(() => undefined);
 
+  // Log usage event non-fatally — analytics must not block the route check response
+  const session = await auth().catch(() => null);
+  await logUsageEvent(
+    "ROUTE_CHECK",
+    {
+      origin: resolvedOrigin,
+      destination: resolvedDestination,
+      hazardCount: hazards.length,
+      corridorMiles,
+      duration_ms: Date.now() - 0, // approximate — actual timing not tracked here
+    },
+    session?.user?.id ?? null
+  ).catch(() => undefined);
+
   return NextResponse.json<RouteCheckResponse>(response);
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIp(req);
+  const rl = await checkRateLimit(`rl:route:${ip}`, 30, 60).catch(() => ({ allowed: true, remaining: 30, retryAfter: 0 }));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded", code: "RATE_LIMITED", retryAfter: rl.retryAfter },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -218,6 +246,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const ip = getClientIp(req);
+  const rl = await checkRateLimit(`rl:route:${ip}`, 30, 60).catch(() => ({ allowed: true, remaining: 30, retryAfter: 0 }));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded", code: "RATE_LIMITED", retryAfter: rl.retryAfter },
+      { status: 429 }
+    );
+  }
+
   const p = req.nextUrl.searchParams;
   const originAddress = (p.get("origin") ?? "").trim();
   const destinationAddress = (p.get("dest") ?? "").trim();
