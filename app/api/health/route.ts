@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { Pool } from "pg";
 import Redis from "ioredis";
 
@@ -113,7 +113,16 @@ async function checkRedis(): Promise<HealthResponse["redis"]> {
   }
 }
 
-export async function GET(): Promise<NextResponse<HealthResponse>> {
+export async function GET(request: NextRequest): Promise<NextResponse<HealthResponse | { status: string }>> {
+  // In production, require a bearer token to prevent infrastructure reconnaissance.
+  // Unauthenticated callers get a minimal liveness response with no internal details.
+  if (process.env.NODE_ENV === "production") {
+    const token = request.headers.get("x-health-token");
+    if (!token || token !== process.env.HEALTH_TOKEN) {
+      return NextResponse.json({ status: "ok" });
+    }
+  }
+
   const [database, redis] = await Promise.all([checkDatabase(), checkRedis()]);
 
   const status = database.connected && redis.connected ? "ok" : "degraded";

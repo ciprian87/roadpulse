@@ -11,6 +11,9 @@ if (!databaseUrl) {
 
 const pool = new Pool({
   connectionString: databaseUrl,
+  // In production the database may be on a remote host — require TLS so credentials
+  // and query data are never transmitted in plaintext over the network.
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: true } : false,
   // Keep idle connections for up to 30 seconds; 10 connections is enough for dev/staging.
   idleTimeoutMillis: 30_000,
   max: 10,

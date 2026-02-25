@@ -5,12 +5,18 @@ import { fetchRoute } from "@/lib/geo/route";
 import { buildCorridor } from "@/lib/geo/corridor";
 import { findHazardsInCorridor } from "@/lib/geo/intersect";
 import { cacheGet, cacheSet } from "@/lib/cache/redis";
-import { checkRateLimit, getClientIp } from "@/lib/middleware/rate-limit";
+import { checkRateLimit, getClientIp, isBodyTooLarge } from "@/lib/middleware/rate-limit";
 import { logUsageEvent } from "@/lib/admin/usage-repository";
 import { auth } from "@/lib/auth/config";
 import type { RouteCheckRequest, RouteCheckResponse, RouteHazard } from "@/lib/types/route";
 
 const CACHE_TTL_SECONDS = 300;
+
+/** Returns true when coordinates are within valid WGS 84 bounds (or undefined). */
+function isValidCoord(lat: number | undefined, lng: number | undefined): boolean {
+  if (lat === undefined || lng === undefined) return true; // will be geocoded
+  return isFinite(lat) && isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
 
 function buildSummary(hazards: RouteHazard[]): RouteCheckResponse["summary"] {
   return {
@@ -196,6 +202,13 @@ async function handleCheck(params: {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (isBodyTooLarge(req, 2_048)) {
+    return NextResponse.json(
+      { error: "Request body too large", code: "PAYLOAD_TOO_LARGE" },
+      { status: 413 }
+    );
+  }
+
   const ip = getClientIp(req);
   const rl = await checkRateLimit(`rl:route:${ip}`, 30, 60).catch(() => ({ allowed: true, remaining: 30, retryAfter: 0 }));
   if (!rl.allowed) {
@@ -234,15 +247,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  return handleCheck({
-    originAddress,
-    originLat: typeof data.originLat === "number" ? data.originLat : undefined,
-    originLng: typeof data.originLng === "number" ? data.originLng : undefined,
-    destinationAddress,
-    destinationLat: typeof data.destinationLat === "number" ? data.destinationLat : undefined,
-    destinationLng: typeof data.destinationLng === "number" ? data.destinationLng : undefined,
-    corridorMiles,
-  });
+  const oLat = typeof data.originLat === "number" ? data.originLat : undefined;
+  const oLng = typeof data.originLng === "number" ? data.originLng : undefined;
+  const dLat = typeof data.destinationLat === "number" ? data.destinationLat : undefined;
+  const dLng = typeof data.destinationLng === "number" ? data.destinationLng : undefined;
+
+  if (!isValidCoord(oLat, oLng) || !isValidCoord(dLat, dLng)) {
+    return NextResponse.json(
+      { error: "Coordinates out of range — lat must be -90..90, lng must be -180..180", code: "INVALID_COORDS" },
+      { status: 400 }
+    );
+  }
+
+  return handleCheck({ originAddress, originLat: oLat, originLng: oLng, destinationAddress, destinationLat: dLat, destinationLng: dLng, corridorMiles });
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -280,13 +297,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const rawDLat = p.get("dest_lat");
   const rawDLng = p.get("dest_lng");
 
-  return handleCheck({
-    originAddress,
-    originLat: rawOLat ? parseFloat(rawOLat) : undefined,
-    originLng: rawOLng ? parseFloat(rawOLng) : undefined,
-    destinationAddress,
-    destinationLat: rawDLat ? parseFloat(rawDLat) : undefined,
-    destinationLng: rawDLng ? parseFloat(rawDLng) : undefined,
-    corridorMiles,
-  });
+  const oLat = rawOLat ? parseFloat(rawOLat) : undefined;
+  const oLng = rawOLng ? parseFloat(rawOLng) : undefined;
+  const dLat = rawDLat ? parseFloat(rawDLat) : undefined;
+  const dLng = rawDLng ? parseFloat(rawDLng) : undefined;
+
+  if (!isValidCoord(oLat, oLng) || !isValidCoord(dLat, dLng)) {
+    return NextResponse.json(
+      { error: "Coordinates out of range — lat must be -90..90, lng must be -180..180", code: "INVALID_COORDS" },
+      { status: 400 }
+    );
+  }
+
+  return handleCheck({ originAddress, originLat: oLat, originLng: oLng, destinationAddress, destinationLat: dLat, destinationLng: dLng, corridorMiles });
 }

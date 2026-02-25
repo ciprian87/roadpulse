@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { getUserByEmail, createUser } from "@/lib/auth/user-repository";
 import { logUsageEvent } from "@/lib/admin/usage-repository";
+import { checkRateLimit, getClientIp, isBodyTooLarge } from "@/lib/middleware/rate-limit";
 
 interface RegisterBody {
   email: string;
@@ -15,6 +16,24 @@ function isValidEmail(email: string): boolean {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (isBodyTooLarge(req, 1_024)) {
+    return NextResponse.json(
+      { error: "Request body too large", code: "PAYLOAD_TOO_LARGE" },
+      { status: 413 }
+    );
+  }
+
+  // 5 registrations per IP per hour — prevents mass account creation and bcrypt DoS.
+  // Fail open if Redis is unavailable so legitimate registrations still succeed.
+  const ip = getClientIp(req);
+  const rl = await checkRateLimit(`rl:register:${ip}`, 5, 3600).catch(() => ({ allowed: true }));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Too many registration attempts. Please try again later.", code: "RATE_LIMITED" },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -50,18 +69,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const existing = await getUserByEmail(email.toLowerCase());
   if (existing) {
-    return NextResponse.json(
-      { error: "An account with that email already exists", code: "EMAIL_TAKEN" },
-      { status: 409 }
-    );
+    // Return the same shape as a successful registration — do not confirm whether the
+    // email is registered. The rate limit (5/hr per IP) is the primary enumeration guard.
+    return NextResponse.json({ success: true }, { status: 200 });
   }
 
   // 12 rounds balances security and latency for a web request
   const password_hash = await bcrypt.hash(password, 12);
 
-  await createUser({ email: email.toLowerCase(), password_hash, name: name.trim() });
+  const newUser = await createUser({ email: email.toLowerCase(), password_hash, name: name.trim() });
 
-  await logUsageEvent("USER_REGISTER", { email: email.toLowerCase() }).catch(() => undefined);
+  // Log userId, not email — avoid storing PII in the append-only usage_events table
+  await logUsageEvent("USER_REGISTER", { userId: newUser.id }, newUser.id).catch(() => undefined);
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

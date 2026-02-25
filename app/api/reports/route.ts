@@ -6,6 +6,7 @@ import {
   isWithinUS,
 } from "@/lib/community/report-repository";
 import { checkReportRateLimit } from "@/lib/community/rate-limit";
+import { isBodyTooLarge, validateBbox } from "@/lib/middleware/rate-limit";
 import { logUsageEvent } from "@/lib/admin/usage-repository";
 import type { CommunityReportType } from "@/lib/types/community";
 
@@ -22,12 +23,24 @@ const VALID_SEVERITIES = new Set(["INFO", "ADVISORY", "WARNING"]);
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const p = req.nextUrl.searchParams;
+
+  const bboxParam = p.get("bbox");
+  if (bboxParam) {
+    const parts = bboxParam.split(",").map(Number);
+    const bboxError = parts.length !== 4 || parts.some(isNaN)
+      ? "bbox must be four comma-separated numbers: west,south,east,north"
+      : validateBbox(parts);
+    if (bboxError) {
+      return NextResponse.json({ error: bboxError, code: "INVALID_BBOX" }, { status: 400 });
+    }
+  }
+
   const session = await auth();
 
   const reports = await listReports({
     state: p.get("state") ?? undefined,
     type: p.get("type") ?? undefined,
-    bbox: p.get("bbox") ?? undefined,
+    bbox: bboxParam ?? undefined,
     limit: p.get("limit") ? parseInt(p.get("limit")!) : undefined,
     offset: p.get("offset") ? parseInt(p.get("offset")!) : undefined,
     userId: session?.user.id,
@@ -49,6 +62,13 @@ interface ReportBody {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  if (isBodyTooLarge(req, 10_240)) {
+    return NextResponse.json(
+      { error: "Request body too large", code: "PAYLOAD_TOO_LARGE" },
+      { status: 413 }
+    );
+  }
+
   const session = await auth();
   if (!session) {
     return NextResponse.json(

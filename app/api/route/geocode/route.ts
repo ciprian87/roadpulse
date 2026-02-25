@@ -1,8 +1,19 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { geocodeSuggestions } from "@/lib/geo/geocode";
+import { checkRateLimit, getClientIp } from "@/lib/middleware/rate-limit";
 import type { GeocodingSuggestion } from "@/lib/types/route";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  // 60 requests per minute per IP — protects the ORS free-tier quota (2000/day).
+  const ip = getClientIp(req);
+  const rl = await checkRateLimit(`rl:geocode:${ip}`, 60, 60).catch(() => ({ allowed: true }));
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: "Rate limit exceeded", code: "RATE_LIMITED" },
+      { status: 429 }
+    );
+  }
+
   const q = req.nextUrl.searchParams.get("q") ?? "";
 
   // Skip the API call for very short inputs — not useful for geocoding

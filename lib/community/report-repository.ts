@@ -146,7 +146,7 @@ export async function createReport(
        (user_id, type, title, description, location, location_description, route_name, state, severity, expires_at)
      VALUES
        ($1, $2, $3, $4, ST_SetSRID(ST_MakePoint($5, $6), 4326), $7, $8, $9, $10,
-        NOW() + INTERVAL '${expiryHours} hours')
+        NOW() + ($11 * INTERVAL '1 hour'))
      RETURNING
        id, user_id, type, title, description,
        ST_AsGeoJSON(location)::json AS geometry,
@@ -165,6 +165,7 @@ export async function createReport(
       data.route_name?.trim() ?? null,
       data.state?.toUpperCase() ?? null,
       data.severity,
+      expiryHours,
     ]
   );
 

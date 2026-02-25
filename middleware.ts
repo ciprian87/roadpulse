@@ -14,6 +14,23 @@ export default auth((req) => {
   // req.auth is the session from NextAuth's JWT — available on edge runtime
   const session = req.auth as { user?: { role?: string } } | null;
 
+  // API routes return JSON — never redirect them to a login page
+  if (pathname.startsWith("/api/admin")) {
+    if (!session?.user) {
+      return NextResponse.json(
+        { error: "Authentication required", code: "UNAUTHORIZED" },
+        { status: 401 }
+      );
+    }
+    if (session.user.role !== "admin") {
+      return NextResponse.json(
+        { error: "Admin access required", code: "FORBIDDEN" },
+        { status: 403 }
+      );
+    }
+    return; // authorized — proceed to the route handler
+  }
+
   if (pathname.startsWith("/admin")) {
     if (!session?.user) {
       const loginUrl = new URL("/account/login", req.url);
@@ -29,5 +46,7 @@ export default auth((req) => {
 }) as (req: NextRequest) => Response | undefined;
 
 export const config = {
-  matcher: ["/account/:path*", "/admin/:path*"],
+  // /api/admin/* added so the edge auth check provides defense-in-depth alongside
+  // the requireAdmin() guards in individual route handlers.
+  matcher: ["/account/:path*", "/admin/:path*", "/api/admin/:path*"],
 };

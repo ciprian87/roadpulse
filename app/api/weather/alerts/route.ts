@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db/index";
-import { checkRateLimit, getClientIp } from "@/lib/middleware/rate-limit";
+import { checkRateLimit, getClientIp, validateBbox } from "@/lib/middleware/rate-limit";
 
 interface AlertRow {
   id: string;
@@ -123,14 +123,11 @@ export async function GET(
 
   if (bbox) {
     const parts = bbox.split(",").map(Number);
-    if (parts.length !== 4 || parts.some(isNaN)) {
-      return NextResponse.json(
-        {
-          error: "bbox must be four comma-separated numbers: west,south,east,north",
-          code: "INVALID_BBOX",
-        },
-        { status: 400 }
-      );
+    const bboxError = parts.length !== 4 || parts.some(isNaN)
+      ? "bbox must be four comma-separated numbers: west,south,east,north"
+      : validateBbox(parts);
+    if (bboxError) {
+      return NextResponse.json({ error: bboxError, code: "INVALID_BBOX" }, { status: 400 });
     }
     const [west, south, east, north] = parts;
     const wp = addParam(west);

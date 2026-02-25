@@ -162,7 +162,7 @@ export async function getUserGrowthSeries(days: number): Promise<UserGrowthPoint
          DATE_TRUNC('day', created_at)::date::text AS date,
          COUNT(*) AS count
        FROM users
-       WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL
+       WHERE created_at >= NOW() - ($1 * INTERVAL '1 day')
        GROUP BY 1
        ORDER BY 1`,
       [days]

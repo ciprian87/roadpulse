@@ -50,10 +50,42 @@ const withPWA = withPWAInit({
   },
 });
 
+const securityHeaders = [
+  // Prevent MIME-type sniffing of responses
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  // Block the page from being embedded in iframes (clickjacking protection)
+  { key: "X-Frame-Options", value: "DENY" },
+  // Limit referrer information sent to third-party origins
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // Restrict browser feature access to only what the app needs
+  { key: "Permissions-Policy", value: "geolocation=(self), camera=(), microphone=()" },
+  // Force HTTPS for 2 years, including subdomains (only sent over HTTPS in practice)
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      // 'unsafe-inline' required by Next.js for inline scripts; tighten with nonces once stable
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      // CartoDB dark/light tiles + OpenStreetMap attribution images
+      "img-src 'self' data: https://*.basemaps.cartocdn.com https://*.openstreetmap.org",
+      // External APIs the browser calls directly (ORS geocode, NWS, Nominatim)
+      "connect-src 'self' https://api.openrouteservice.org https://api.weather.gov https://nominatim.openstreetmap.org",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
+];
+
 const nextConfig: NextConfig = {
   // Empty turbopack config silences the "webpack config present but no turbopack config" warning.
   // next-pwa uses webpack internally; Turbopack is used for dev, webpack for prod builds.
   turbopack: {},
+  async headers() {
+    return [{ source: "/(.*)", headers: securityHeaders }];
+  },
 };
 
 export default withPWA(nextConfig);

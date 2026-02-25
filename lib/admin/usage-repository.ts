@@ -100,7 +100,7 @@ export async function getRouteCheckTimeSeries(days: number): Promise<TimeSeriesP
          COUNT(*) AS count
        FROM usage_events
        WHERE event_type = 'ROUTE_CHECK'
-         AND created_at >= NOW() - ($1 || ' days')::INTERVAL
+         AND created_at >= NOW() - ($1 * INTERVAL '1 day')
        GROUP BY 1
        ORDER BY 1`,
       [days]
@@ -155,7 +155,7 @@ function buildActivityDescription(type: string, meta: Record<string, unknown>): 
     case "ROUTE_CHECK":
       return `Route check: ${meta.origin ?? "??"} → ${meta.destination ?? "??"}`;
     case "USER_REGISTER":
-      return `New user registered: ${meta.email ?? "unknown"}`;
+      return `New user registered (ID: ${String(meta.userId ?? "unknown").slice(0, 8)})`;
     case "USER_LOGIN":
       return `User logged in: ${meta.email ?? "unknown"}`;
     case "REPORT_SUBMIT":

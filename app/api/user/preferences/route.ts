@@ -46,6 +46,12 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   }
 
   if (defaultRegion !== undefined) {
+    if (typeof defaultRegion !== "string" || defaultRegion.length > 100) {
+      return NextResponse.json(
+        { error: "defaultRegion must be a string of at most 100 characters", code: "INVALID_REGION" },
+        { status: 400 }
+      );
+    }
     updates.defaultRegion = defaultRegion;
   }
 

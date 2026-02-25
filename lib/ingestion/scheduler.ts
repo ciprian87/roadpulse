@@ -9,6 +9,24 @@ export interface SchedulerResult {
   error?: string;
 }
 
+// Delete rows older than their retention window so the tables don't grow unboundedly.
+// This runs automatically on every cron cycle — no manual admin action required.
+async function pruneStaleData(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    // ingestion_logs: 30-day retention (matches admin UI default)
+    await client.query(
+      "DELETE FROM ingestion_logs WHERE created_at < NOW() - INTERVAL '30 days'"
+    );
+    // usage_events: 90-day retention (matches admin UI default)
+    await client.query(
+      "DELETE FROM usage_events WHERE created_at < NOW() - INTERVAL '90 days'"
+    );
+  } finally {
+    client.release();
+  }
+}
+
 // Run all registered ingestion jobs sequentially.
 // New feeds are added by registering them in feed-registry.ts — never by
 // modifying individual adapters or this file.
@@ -35,7 +53,17 @@ export async function runAllIngestJobs(): Promise<SchedulerResult[]> {
     results.push({ feed: "community-reports-expiry", error: message });
   }
 
-  // 3. Road event feed adapters — sequential to avoid DB pool exhaustion.
+  // 3. Log table pruning — keeps ingestion_logs (30d) and usage_events (90d) bounded.
+  // Non-fatal: a prune failure must never abort the ingestion run.
+  try {
+    await pruneStaleData();
+    results.push({ feed: "log-pruning", result: { upserted: 0, deactivated: 0, purged: 0, fetchMs: 0, total: 0 } });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    results.push({ feed: "log-pruning", error: message });
+  }
+
+  // 4. Road event feed adapters — sequential to avoid DB pool exhaustion.
   // Each adapter catches and records its own failure in feed_status, so a
   // single feed going down does not abort the remaining adapters.
   // Adapters with is_enabled = false in feed_status are skipped.

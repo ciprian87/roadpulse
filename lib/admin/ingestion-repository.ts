@@ -85,7 +85,7 @@ export async function getFeedIngestionSeries(feedName: string, days: number): Pr
          AVG(duration_ms)::int AS duration_ms
        FROM ingestion_logs
        WHERE feed_name = $1
-         AND created_at >= NOW() - ($2 || ' days')::INTERVAL
+         AND created_at >= NOW() - ($2 * INTERVAL '1 day')
        GROUP BY 1
        ORDER BY 1`,
       [feedName, days]

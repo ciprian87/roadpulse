@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/admin/auth-guard";
 import { ingestWeatherAlerts } from "@/lib/ingestion/weather-ingest";
 import { runAllIngestJobs, type SchedulerResult } from "@/lib/ingestion/scheduler";
 import { getAdapterByName, getAllFeedNames } from "@/lib/feeds/feed-registry";
@@ -21,16 +22,11 @@ interface AllIngestResponse {
 
 // POST /api/admin/ingest
 // Manually triggers a feed ingestion run. Useful for testing and development.
-// No auth required in Phase 3 — add NextAuth protection before going to production.
-export async function POST(
-  request: NextRequest
-): Promise<
-  NextResponse<
-    | SingleIngestResponse
-    | AllIngestResponse
-    | { error: string; code: string; details?: unknown }
-  >
-> {
+// Requires admin role — unauthenticated/non-admin callers receive 401/403.
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
   let body: unknown;
   try {
     body = await request.json();
